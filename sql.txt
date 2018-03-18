@@ -1,0 +1,11 @@
+CREATE TABLE `kakabot`.`kakabot` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `cas` VARCHAR(45) NULL,
+  `maincurr` VARCHAR(10) NULL,
+  `currency` VARCHAR(10) NULL,
+  `stav` VARCHAR(10) NULL,
+  `kurz` DOUBLE NULL,
+  `kolik` DOUBLE NULL,
+  `uspech` INT NULL,
+  `kdo` VARCHAR(45) NULL,
+  PRIMARY KEY (`id`));
