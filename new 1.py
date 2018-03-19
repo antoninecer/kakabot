@@ -1,15 +1,15 @@
 import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys
 
 maincurr = 'usd'  # usd
-currency = 'eth'  # doge
+currency = 'ltc'  # doge, eth
 par = currency + '_' + maincurr
 interest = ('doge', 'usd')
 yobit_key = 'key'
 yobit_secret_key = 'secret'
 run = True
-vklad = 0.3 # kolik dat na jeden obchod z celkoveho mnozstvi
-provize = 0.004 # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
-
+vklad = 0.3  # kolik dat na jeden obchod z celkoveho mnozstvi
+provize = 0.004  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
+rozhodcibod = 0.01  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
 # pristup do databaze
 db = "kakabot"
 uzivatel = "kakabot"
@@ -18,6 +18,7 @@ server = "127.0.0.1"
 
 # promenne pro muj algoritmus
 stav = 'nic'
+stavlast = 'nic'
 ccactual = 0.00
 cclast = 0.00
 ccpoint = 0.00
@@ -115,14 +116,27 @@ def sql_obchod(kolik):
 
 
 def sql_posledni(s):
+    global maincurr,currency
     jmeno = socket.gethostname()
     cnx = mysql.connector.connect(user=uzivatel, password=heslo, host=server, database=db)
     x = cnx.cursor()
     try:
-        x.execute("select kurz from kakabot.kakabot where stav= '" + s +"' and kdo = '" + jmeno + "' order by id desc limit 1")
+        x.execute("select kurz from kakabot.kakabot where maincurr= '" + maincurr + "' and currency= '" + currency + "' and stav= '" + s +"' and kdo = '" + jmeno + "' order by id desc limit 1")
         return x.fetchone()[0]
     except:
         return 0
+    cnx.close()
+
+def sql_last_stav():
+    global maincurr, currency
+    jmeno = socket.gethostname()
+    cnx = mysql.connector.connect(user=uzivatel, password=heslo, host=server, database=db)
+    x = cnx.cursor()
+    try:
+        x.execute("select stav from kakabot.kakabot where  maincurr= '" + maincurr + "' and currency= '" + currency + "' and kdo = '" + jmeno + "' order by id desc limit 1")
+        return x.fetchone()[0]
+    except:
+        return 'nic'
     cnx.close()
 
 
@@ -135,6 +149,7 @@ def sestav_vetu():
 actvol()
 nakuppri=sql_posledni("nakup")
 prodejpri=sql_posledni("prodej")
+stavlast=sql_last_stav()
 print("posledni nakup>" + str(nakuppri))
 print("posledni prodej>" + str(prodejpri))
 """if ccactual > prodejpri:
@@ -177,18 +192,24 @@ while run:
         else:
             stav="nakup"
             plus = 0
-        # veta = veta + stav
         ccpoint = ccactual
-        # zapis()
-    if stav == "prodej" and ccactual < cclast and (ccactual/ccstart)-1 > 0.05 :  # je zde od startu o pul procento vice
-        # penezenka()
-        actvol()
-        print("naposledy nakoupeno za >" + str(nakuppri))
-        time.sleep(2)
-        # for poptavka in aktivni_obchody(pair,"sell"):
-         #   print("poptavka[0]> " + str(poptavka[0]) + " poptavka[1]> " + str(poptavka[1]))
-        if currencyvol > 0.0:
-            # if nakuppri == 0 or ccactual > nakuppri:
+
+    if plus != 0:
+       if plus == 1:
+          vloz = 0.38195
+       elif plus >=2 and plus <=4:
+           vloz = 0.5
+       elif plus >= 5 and plus <= 7:
+           vloz = 0.7
+       elif plus > 8:
+           vloz = 0.8
+
+    if stav == "prodej" and ccactual < cclast and (ccactual/ccstart)-1 > rozhodcibod :
+        if (stavlast == stav and ccactual > prodejpri) or stavlast != stav:
+            actvol()
+            print("naposledy nakoupeno za >" + str(nakuppri))
+            time.sleep(2)
+            if currencyvol > 0.0:
                 zapis("uskutecni prodej >")
                 print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
                 print(yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(par, ccactual, currencyvol * vloz))
@@ -197,14 +218,14 @@ while run:
                 prodejpri = ccactual
                 ccstart = ccactual
 
-    if stav == "nakup" and ccactual > cclast  and (ccstart/ccactual)-1 > 0.05 :  # je od start/posledni transakce o pul procenta 
-        # penezenka()
+    if stav == "nakup" and ccactual > cclast  and (ccstart/ccactual)-1 > rozhodcibod :
         actvol()
         print("naposledy prodano za >" + str(prodejpri))
         time.sleep(2)
         # for nabidka in aktivni_obchody(pair,"buy"):
          #   print(" nabidka[0]> " + str(nabidka[0]) + " nabidka[1] > " + str(nabidka[1]))
-        if maincurrvol > 0.0:
+        if (stavlast == stav and ccactual < nakuppri) or stavlast != stav :
+            if maincurrvol > 0.0:
             # if prodejpri == 0 or ccactual < prodejpri:
                 zapis("uskutecni nakup >")  # , str(aktivni_obchody(pair,"buy")))
                 print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
@@ -229,15 +250,7 @@ while run:
 # 17.3 12:44 eth >> 0.015 : usd >> 11.52376607
 # 13>58  eth >> 0.02003553 : usd >> 6.00754875
     # toto zatim neresit
-#    if plus != 0:
-#        if plus == 1:
-#            vloz = 0.3
-#        elif plus >=2 and plus <=4:
-#            vloz = 0.5
-#        elif plus >= 5 and plus <= 7:
-#            vloz = 0.7
-#        elif plus > 8:
-#            vloz = 1
+
 #    else:
 #        vloz=vklad
     # print(veta)
