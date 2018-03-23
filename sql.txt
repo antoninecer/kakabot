@@ -8,4 +8,5 @@ CREATE TABLE `kakabot`.`kakabot` (
   `kolik` DOUBLE NULL,
   `uspech` INT NULL,
   `kdo` VARCHAR(45) NULL,
+   plus` INT NULL,
   PRIMARY KEY (`id`));
