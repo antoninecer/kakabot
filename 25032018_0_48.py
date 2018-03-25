@@ -5,8 +5,8 @@ currency = 'ltc'  # doge, eth
 rozhodcibod = 0.007236  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
 delay = 10  # spozdeni v sekundach
 # yobit api
-yobit_key = '7CAB844ADB34E4B1868AA0204FFE853E'
-yobit_secret_key = 'db48622b8dac25b1b61ca8f04bdce300'
+yobit_key = 'key'
+yobit_secret_key = 'secret'
 # access to databaze
 db = "kakabot"
 uzivatel = "kakabot"
