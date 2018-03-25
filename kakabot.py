@@ -304,7 +304,7 @@ while run:
 
                         if obchodza > maxvkladcurr:
                             obchodza = maxvkladcurr
-                        prodejyo(prodej[0],obchodza,"prodej z nabidky")
+                        prodejyo(nakup[0],obchodza,"prodej z nabidky")
 
             if stav == "prodej":
                 ostatniprodej = aktivni_obchody(par, "sell")
