@@ -10,5 +10,5 @@ CREATE TABLE `kakabot`.`kakabot` (
   `kdo` VARCHAR(45) NULL,
   `plus` INT NULL,
   `popis` VARCHAR(100) NULL,
-  `yoid` INT NULL,
-  PRIMARY KEY (`id`));
+  `yoid` VARCHAR(30) NULL,
+PRIMARY KEY (`id`));
