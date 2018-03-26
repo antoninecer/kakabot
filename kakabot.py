@@ -17,7 +17,6 @@ provize = 0.003618  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde
 maxvkladcurr = 100  # maximalni vklad na jeden prodej currency
 maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
 obchodza = 0  # za kolik bude uskutecnen obchod
-
 # promenne pro muj algoritmus
 stav = 'nic'
 stavlast = 'nic'
@@ -324,8 +323,8 @@ while run:
                         obchodza = currencyvol * vloz
                     if obchodza > maxvkladcurr:
                         obchodza = maxvkladcurr
-                    reset = "noreset"    
-                    prodejyo(nakup[0],obchodza,"prodej z nabidky","noreset")
+                    reset = "noreset"
+                    prodejyo(nakup[0],obchodza,"prodej z nabidky")
 
         if stav == "prodej":
             ostatniprodej = aktivni_obchody(par, "sell")
@@ -341,7 +340,7 @@ while run:
                     if obchodza > maxvkladmaincurr:
                         obchodza = maxvkladmaincurr
                     reset = "noreset"
-                    nakupyo(prodej[0],obchodza,"nakup z nabidky","noreset")
+                    nakupyo(prodej[0],obchodza,"nakup z nabidky")
 
     cclast=ccactual  # nastavi predchozi kurz aktualnim
     time.sleep(delay)  # pocka nastavenou dobu
