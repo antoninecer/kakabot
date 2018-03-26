@@ -33,7 +33,7 @@ currencyvol = 0.00  # nacte z penezenky
 par = currency + '_' + maincurr
 ostatniprodej = 0
 ostatninakup = 0
-tecka = 0
+dot = 0  # tecka
 
 run = True  # jestli se spusti program hodnota True / False
 
@@ -207,11 +207,11 @@ def aktivni_objednavky():
             print(rf["rate"])
 
 def tecka():
-    global tecka
-    if tecka >= 18:  # po 3 minutach udelej dalsi radek
+    global dot
+    if dot >= 18:  # po 3 minutach udelej dalsi radek
         print("po 3 minutach " +str(datetime.datetime.now()) + " : " + par + " : act >" + str(ccactual) + "<:")
-        tecka = 0
-    tecka += 1
+        dot = 0
+    dot += 1
     sys.stdout.write('.')
     sys.stdout.flush()
 
@@ -298,13 +298,11 @@ while run:
                 nakupyo(ccactual,nakup,"nakup pri zmene kurzu")
 
     if ccactual != cclast:
-
+        up = (ccstart / ccactual)
+        down = (ccactual / ccstart)
         print("Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< rozhodcibod >" + str(rozhodcibod) + "< plus > " + str(plus))
 
         if plus >= 1:  # mame zde plus nic aktivn2 neobchuduji, kouknemese na poptavky a nabidky do yobitu
-            up = (ccstart/ccactual)
-            down = (ccactual/ccstart)
-
             if stav == "prodej":
                 ostatninakup = aktivni_obchody(par,"buy")
                 print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
