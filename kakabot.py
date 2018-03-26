@@ -33,6 +33,7 @@ currencyvol = 0.00  # nacte z penezenky
 par = currency + '_' + maincurr
 ostatniprodej = 0
 ostatninakup = 0
+tecka = 0
 
 run = True  # jestli se spusti program hodnota True / False
 
@@ -100,10 +101,11 @@ def sql_obchod(kolik, poznamka, id):
     veta += str(ccactual) + "," + str(kolik) + ",'" + socket.gethostname()  + "'," + str(plus) +", '" + str(poznamka) + "','" + str(id) + "');"
     print(veta)
     try:
-        x.execute(veta)
+        print(x.execute(veta))
         cnx.commit()
     except:
         cnx.rollback()
+
 
 def sql_posledni(s):
     global maincurr,currency
@@ -204,6 +206,16 @@ def aktivni_objednavky():
             print(rf["amount"])
             print(rf["rate"])
 
+def tecka():
+    global tecka
+    if tecka >= 18:  # po 3 minutach udelej dalsi radek
+        print("po 3 minutach " +str(datetime.datetime.now()) + " : " + par + " : act >" + str(ccactual) + "<:")
+        tecka = 0
+    tecka += 1
+    sys.stdout.write('.')
+    sys.stdout.flush()
+
+
 # zacatek programu - nacteme udaje z penezenky a kouknem za kolik jsme naposled nakoupili a prodali
 actvol()
 nakuppri=sql_posledni("nakup")
@@ -227,9 +239,7 @@ while run:
         time.sleep(10)
         continue
 
-    sys.stdout.write('.')
-    sys.stdout.flush()
-    # veta = str(datetime.datetime.now()) + " : " + par + " : act >" + str(ccactual) + "<: "
+    tecka()
 
     if (ccactual - ccpoint)  > (ccactual * provize):  # zvyseni stav ovice jak 0,4% - nastav prodej
         if stav=="prodej":  # pridat kontrolu stavu a upravu plusu
@@ -288,12 +298,16 @@ while run:
                 nakupyo(ccactual,nakup,"nakup pri zmene kurzu")
 
     if ccactual != cclast:
-        if plus >= 1:
+
+        print("Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< rozhodcibod >" + str(rozhodcibod) + "< plus > " + str(plus))
+
+        if plus >= 1:  # mame zde plus nic aktivn2 neobchuduji, kouknemese na poptavky a nabidky do yobitu
             up = (ccstart/ccactual)
             down = (ccactual/ccstart)
-            print("Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart)  + "< rozhodcibod >" + str(rozhodcibod) + "< plus > "+str(plus))
+
             if stav == "prodej":
                 ostatninakup = aktivni_obchody(par,"buy")
+                print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
                 for nakup in ostatninakup:
                     print(nakup[0], nakup[1])
                     if nakup[0] - ccstart  > ccactual * provize :
@@ -308,6 +322,7 @@ while run:
 
             if stav == "prodej":
                 ostatniprodej = aktivni_obchody(par, "sell")
+                print(" kurz je nizsi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou nakoupit ")
                 for prodej in ostatniprodej:
                     print(prodej[0], prodej[1])
                     if  ccstart - prodej[0] > ccactual * provize:
@@ -329,6 +344,3 @@ try:
 except Exception:
     time.sleep(10)
 print (ccactual)
-
-# ltc >> 0.06950649 : usd >> 34.74908483 .21.3.2018 21:57
-
