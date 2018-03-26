@@ -34,6 +34,7 @@ par = currency + '_' + maincurr
 ostatniprodej = 0
 ostatninakup = 0
 dot = 0  # tecka
+reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccactual (kdyz vybiram z nabidek, tak nemohu resetovat reset = "noreset")
 
 run = True  # jestli se spusti program hodnota True / False
 
@@ -159,9 +160,6 @@ def nakupyo(kurz,zakolik,poznamka):
     o = json.loads(json.dumps(odpoved))
     print(o["success"])
     if o["success"] == 1:  #podařilo se zadat nabídku na prodej do yobit
-        nakuppri = kurz
-        ccpoint = kurz
-        ccstart = kurz
         re = json.loads(json.dumps(o["return"]))
         print(re["order_id"])
         print(re["server_time"])
@@ -170,6 +168,12 @@ def nakupyo(kurz,zakolik,poznamka):
         fu = json.loads(json.dumps(re["funds"]))  # aktualizuji currencyvol a maincurrvol
         maincurrvol = fu[maincurr]
         currencyvol = fu[currency]
+        nakuppri = kurz
+        if reset == "noreset":
+            print("neresetuji promenne ccpoint a ccstart")
+        else:
+            ccpoint = kurz
+            ccstart = kurz
 
 def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za kolik v maincurr, poznamka
     global prodejpri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
@@ -179,9 +183,6 @@ def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za k
     o = json.loads(json.dumps(odpoved))
     print(o["success"])
     if o["success"] == 1:  #podařilo se zadat nabídku na prodej do yobit
-        prodejpri = kurz
-        ccpoint = kurz
-        ccstart = kurz
         re = json.loads(json.dumps(o["return"]))
         print(re["order_id"])
         print(re["server_time"])
@@ -190,6 +191,13 @@ def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za k
         fu = json.loads(json.dumps(re["funds"]))  # aktualizuji currencyvol a maincurrvol
         maincurrvol = fu[maincurr]
         currencyvol = fu[currency]
+        prodejpri = kurz
+        if reset == "noreset":
+            print("neresetuji promenne ccpoint a ccstart")
+        else:
+            ccpoint = kurz
+            ccstart = kurz
+
 
 def aktivni_objednavky():
     s = yobit_api.TradeApi(yobit_key, yobit_secret_key).get_active_orders(par)
@@ -233,6 +241,7 @@ if ccactual < prodejpri and ccactual > nakuppri:
 vloz = vklad
 
 while run:
+    reset = "yes"
     try:
         nacti()
     except Exception:
@@ -302,36 +311,37 @@ while run:
         down = (ccactual / ccstart)
         print("Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< rozhodcibod >" + str(rozhodcibod) + "< plus > " + str(plus))
 
-        if plus >= 1:  # mame zde plus nic aktivn2 neobchuduji, kouknemese na poptavky a nabidky do yobitu
-            if stav == "prodej":
-                ostatninakup = aktivni_obchody(par,"buy")
-                print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
-                for nakup in ostatninakup:
-                    print(nakup[0], nakup[1])
-                    if nakup[0] - ccstart  > ccactual * provize :
-                        if nakup[1] <= currencyvol * vloz:  # prodava za mene, nez ja mohu nakupvat
-                            obchodza = nakup[1]
-                        elif nakup[1] >= currencyvol * vloz:  # Prodava za vice, nez ja mohu nakupovat
-                            obchodza = currencyvol * vloz
+    if plus >= 1:  # mame zde plus nic aktivn2 neobchuduji, kouknemese na poptavky a nabidky do yobitu
+        if stav == "prodej":
+            ostatninakup = aktivni_obchody(par,"buy")
+            print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
+            for nakup in ostatninakup:
+                print(nakup[0], nakup[1])
+                if nakup[0] - ccstart  > ccactual * provize :
+                    if nakup[1] <= currencyvol * vloz:  # prodava za mene, nez ja mohu nakupvat
+                        obchodza = nakup[1]
+                    elif nakup[1] >= currencyvol * vloz:  # Prodava za vice, nez ja mohu nakupovat
+                        obchodza = currencyvol * vloz
+                    if obchodza > maxvkladcurr:
+                        obchodza = maxvkladcurr
+                    reset = "noreset"    
+                    prodejyo(nakup[0],obchodza,"prodej z nabidky","noreset")
 
-                        if obchodza > maxvkladcurr:
-                            obchodza = maxvkladcurr
-                        prodejyo(nakup[0],obchodza,"prodej z nabidky")
-
-            if stav == "prodej":
-                ostatniprodej = aktivni_obchody(par, "sell")
-                print(" kurz je nizsi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou nakoupit ")
-                for prodej in ostatniprodej:
-                    print(prodej[0], prodej[1])
-                    if  ccstart - prodej[0] > ccactual * provize:
-                        nakup = (maincurrvol * vloz) / prodej[1]
-                        if prodej[1] <= nakup:  # nakupuje za mene, nez ja mohu prodat
-                            obchodza = prodej[1]
-                        elif prodej[1] >= nakup:  # nakupuje za vice, nez ja mohu prodat
-                            obchodza = nakup
-                        if obchodza > maxvkladmaincurr:
-                            obchodza = maxvkladmaincurr
-                        nakupyo(prodej[0],obchodza,"nakup z nabidky")
+        if stav == "prodej":
+            ostatniprodej = aktivni_obchody(par, "sell")
+            print(" kurz je nizsi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou nakoupit ")
+            for prodej in ostatniprodej:
+                print(prodej[0], prodej[1])
+                if  ccstart - prodej[0] > ccactual * provize:
+                    nakup = (maincurrvol * vloz) / prodej[1]
+                    if prodej[1] <= nakup:  # nakupuje za mene, nez ja mohu prodat
+                        obchodza = prodej[1]
+                    elif prodej[1] >= nakup:  # nakupuje za vice, nez ja mohu prodat
+                        obchodza = nakup
+                    if obchodza > maxvkladmaincurr:
+                        obchodza = maxvkladmaincurr
+                    reset = "noreset"
+                    nakupyo(prodej[0],obchodza,"nakup z nabidky","noreset")
 
     cclast=ccactual  # nastavi predchozi kurz aktualnim
     time.sleep(delay)  # pocka nastavenou dobu
