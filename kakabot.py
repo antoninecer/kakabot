@@ -152,7 +152,7 @@ def sestav_vetu():
 
 def nakupyo(kurz,zakolik,poznamka):
     global nakuppri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
-    nakup = zakolik / kurz
+    nakup = zakolik  / kurz
     print(str(datetime.datetime.now()) +" budem nakupovat : " + currency + " za >" + str(zakolik) + " " + maincurr)
     print(nakup)
     odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).buy(par, kurz, nakup)
@@ -303,7 +303,7 @@ while run:
             # if prodejpri == 0 or ccactual < prodejpri:
                 zapis("uskutecni nakup >")  # , str(aktivni_obchody(pair,"buy")))
                 print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
-                nakup = (maincurrvol * vloz)/ccactual
+                nakup = (maincurrvol * vloz)  # /ccactual co se to tu deje
                 nakupyo(ccactual,nakup,"nakup pri zmene kurzu")
 
     if ccactual != cclast:
