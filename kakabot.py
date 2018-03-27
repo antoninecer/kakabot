@@ -17,6 +17,7 @@ provize = 0.003618  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde
 maxvkladcurr = 100  # maximalni vklad na jeden prodej currency
 maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
 obchodza = 0  # za kolik bude uskutecnen obchod
+
 # promenne pro muj algoritmus
 stav = 'nic'
 stavlast = 'nic'
@@ -312,6 +313,7 @@ while run:
 
     if plus >= 1:  # mame zde plus nic aktivn2 neobchuduji, kouknemese na poptavky a nabidky do yobitu
         if stav == "prodej":
+            time.sleep(1)
             ostatninakup = aktivni_obchody(par,"buy")
             print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
             for nakup in ostatninakup:
@@ -326,7 +328,8 @@ while run:
                     reset = "noreset"
                     prodejyo(nakup[0],obchodza,"prodej z nabidky")
 
-        if stav == "prodej":
+        if stav == "nakup":
+            time.sleep(1)
             ostatniprodej = aktivni_obchody(par, "sell")
             print(" kurz je nizsi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou nakoupit ")
             for prodej in ostatniprodej:
@@ -346,8 +349,3 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
-try:
-    nacti()
-except Exception:
-    time.sleep(10)
-print (ccactual)
