@@ -77,7 +77,7 @@ def actvol(*s):  # naplni  maincurrvol a currencyvol stavem z penezenky pokud s=
                 hodnota.get('sell')))
 
 def nacti():  # nacte hodnotu cc
-    global ccpoint, ccactual, ccstart
+    global ccpoint, ccactual, ccstart, maxvkladcurr
     hodnota = yobit_api.PublicApi().get_pair_ticker(pair=par)
     ccactual = hodnota.get('last')
     maxvkladcurr = maxvkladmaincurr / ccactual
@@ -330,8 +330,8 @@ while run:
                         obchodza = nakup[1]
                     elif nakup[1] >= currencyvol * vloz:  # Prodava za vice, nez ja mohu nakupovat
                         obchodza = currencyvol * vloz
-                    if obchodza > maxvkladmaincurr:
-                        obchodza = maxvkladmaincurr
+                    if obchodza > maxvkladcurr:
+                        obchodza = maxvkladcurr
                     reset = "noreset"
                     prodejyo(nakup[0],obchodza,"prodej z nabidky")
 
@@ -356,3 +356,4 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
+
