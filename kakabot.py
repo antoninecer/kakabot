@@ -14,7 +14,7 @@ heslo = "Pesfilipes.7"
 server = "127.0.0.1"
 vklad = 0.45  # kolik dat na jeden obchod z celkoveho mnozstvi
 provize = 0.003618  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
-maxvkladcurr = 100  # maximalni vklad na jeden prodej currency
+maxvkladcurr = 0  # maximalni vklad na jeden prodej currency musim propocist z maincurr
 maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
 obchodza = 0  # za kolik bude uskutecnen obchod
 
@@ -80,6 +80,7 @@ def nacti():  # nacte hodnotu cc
     global ccpoint, ccactual, ccstart
     hodnota = yobit_api.PublicApi().get_pair_ticker(pair=par)
     ccactual = hodnota.get('last')
+    maxvkladcurr = maxvkladmaincurr / ccactual
     # {'high': 603.3402, 'low': 481.50898705,
     # 'avg': 542.42459352, 'vol': 566012.01104146, 'vol_cur': 1082.91016055,
     # 'last': 532.42971141, 'buy': 530.92620723, 'sell': 532.42971141, 'updated': 1521406380}
@@ -184,7 +185,7 @@ def nakupyo(kurz,zakolik,poznamka):
 
 def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za kolik v maincurr, poznamka
     global prodejpri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
-    print(str(datetime.datetime.now()) +" budem prodavat : " + currency + " za >" + str(zakolik) + " " + maincurr)
+    print(str(datetime.datetime.now()) +" budem prodavat :  >" + str(zakolik) + " " + currency)
     odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(par, kurz, zakolik)
     print(odpoved)
     o = json.loads(json.dumps(odpoved))
@@ -329,8 +330,8 @@ while run:
                         obchodza = nakup[1]
                     elif nakup[1] >= currencyvol * vloz:  # Prodava za vice, nez ja mohu nakupovat
                         obchodza = currencyvol * vloz
-                    if obchodza > maxvkladcurr:
-                        obchodza = maxvkladcurr
+                    if obchodza > maxvkladmaincurr:
+                        obchodza = maxvkladmaincurr
                     reset = "noreset"
                     prodejyo(nakup[0],obchodza,"prodej z nabidky")
 
