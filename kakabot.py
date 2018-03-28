@@ -39,16 +39,23 @@ reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccact
 run = True  # jestli se spusti program hodnota True / False
 
 def aktivni_obchody(menovypar,co):  # vybere 4 nejlepsi nabizene obchody na yobitu :menovypar "ltc_usd" :co sell/buy
-    link = "https://yobit.net/api/3/depth/" + menovypar + "?limit=4"
-    f = requests.get(link)
-    nabidky = f.json().get(par).get('bids')
-    poptavky = f.json().get(par).get('asks')
-    if co == "buy" or co == "nakup":
-        return nabidky
-    if co == "sell" or co == "prodej":
-        return poptavky
-    else:
-        return "NO"
+    mam = False
+    navrat = 0
+    while not mam:
+        try:
+            link = "https://yobit.net/api/3/depth/" + menovypar + "?limit=4"
+            f = requests.get(link)
+            nabidky = f.json().get(par).get('bids')
+            poptavky = f.json().get(par).get('asks')
+            if co == "buy" or co == "nakup":
+                navrat = nabidky
+            if co == "sell" or co == "prodej":
+                navrat = poptavky
+            mam = True
+        except:
+            print("nepovedlo se načíst údaje o aktivních obchodech, zkusím to znovu za pár vteřin")
+            time.sleep(2)
+    return navrat
 
 def actvol(*s):  # naplni  maincurrvol a currencyvol stavem z penezenky pokud s=="all" vypise vse v penezence
     global maincurrvol, currencyvol, maincurr, currency
@@ -349,3 +356,8 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
+
+# doge >> 11590.50248718 : usd >> 32.90711086 . 27.3.2018 19:30
+
+print(aktivni_obchody(par,"prodej"))
+print(aktivni_obchody(par,"nakup"))
