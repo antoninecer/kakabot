@@ -1,7 +1,7 @@
 import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys
 
-maincurr = 'usd'  # # usd-btc-doge-rur-eth-waves
-currency = 'ltc'  # doge, eth
+maincurr = 'usd'  # usd-btc-doge-rur-eth-waves
+currency = 'doge'  # doge, eth
 rozhodcibod = 0.007236  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
 delay = 10  # spozdeni v sekundach
 # yobit api
@@ -9,8 +9,8 @@ yobit_key = 'key'
 yobit_secret_key = 'secret'
 # access to databaze
 db = "kakabot"
-uzivatel = "kakabot"
-heslo = "kvtd2qBd8W1Qcols"
+uzivatel = "root"
+heslo = "Pesfilipes.7"
 server = "127.0.0.1"
 vklad = 0.45  # kolik dat na jeden obchod z celkoveho mnozstvi
 provize = 0.003618  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
@@ -184,7 +184,7 @@ def nakupyo(kurz,zakolik,poznamka):
 
 def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za kolik v maincurr, poznamka
     global prodejpri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
-    print(str(datetime.datetime.now()) +" budem nakupovat : " + currency + " za >" + str(zakolik) + " " + maincurr)
+    print(str(datetime.datetime.now()) +" budem prodavat : " + currency + " za >" + str(zakolik) + " " + maincurr)
     odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(par, kurz, zakolik)
     print(odpoved)
     o = json.loads(json.dumps(odpoved))
@@ -283,7 +283,6 @@ while run:
            vloz = 0.7
         elif plus >= 5:
            vloz = 0.8
-# sem dod2lat pokud je plus v9c jak 1 tak se koukat po aktualnich nabidkach jestli koupime ci prodame za poptavane ceny
 
     if stav == "prodej" and ccactual < cclast and (ccactual/ccstart)-1 > rozhodcibod :
         if (stavlast == stav and ccactual > prodejpri) or stavlast != stav:
@@ -356,8 +355,3 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
-
-# doge >> 11590.50248718 : usd >> 32.90711086 . 27.3.2018 19:30
-
-print(aktivni_obchody(par,"prodej"))
-print(aktivni_obchody(par,"nakup"))
