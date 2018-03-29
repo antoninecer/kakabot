@@ -89,6 +89,7 @@ def nacti():  # nacte hodnotu cc
         ccstart = ccactual
 
 def zapis(*s):
+    global ccpoint,stav,plus,vloz,vklad
     file = open("log_" + par + ".txt", "a")
     for i in s:
         print(i)
@@ -194,7 +195,7 @@ def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za k
         re = json.loads(json.dumps(o["return"]))
         print(re["order_id"])
         print(re["server_time"])
-        zapis("prodej " + str(kurz) + " za " + str(zakolik) + " " + maincurr)
+        zapis("prodej v kurzu" + str(kurz) + " za " + str(zakolik) + " " + currency)
         sql_obchod(str(zakolik), str(poznamka), re["order_id"])
         fu = json.loads(json.dumps(re["funds"]))  # aktualizuji currencyvol a maincurrvol
         maincurrvol = fu[maincurr]
@@ -356,4 +357,3 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
-
