@@ -337,8 +337,9 @@ while run:
                         obchodza = currencyvol * vloz
                     if obchodza > maxvkladcurr:
                         obchodza = maxvkladcurr
-                    reset = "noreset"
-                    prodejyo(nakup[0],obchodza,"prodej z nabidky")
+                    if obchodza > minvkladmaincurr:
+                        reset = "noreset"
+                        prodejyo(nakup[0],obchodza,"prodej z nabidky")
 
         if stav == "nakup":
             time.sleep(1)
