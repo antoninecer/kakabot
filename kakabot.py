@@ -14,9 +14,12 @@ heslo = "Pesfilipes.7"
 server = "127.0.0.1"
 vklad = 0.45  # kolik dat na jeden obchod z celkoveho mnozstvi
 provize = 0.003618  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
-maxvkladcurr = 0  # maximalni vklad na jeden prodej currency musim propocist z maincurr
+maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
 maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
+minvkladcurr=0
+minvkladmaincurr=0.1  # minimalni vklad 0.1 USD
 obchodza = 0  # za kolik bude uskutecnen obchod
+
 
 # promenne pro muj algoritmus
 stav = 'nic'
@@ -98,9 +101,7 @@ def zapis(*s):
     file.write(sestav_vetu())
     file.close()
     ccpoint = ccactual
-    stav = "nic"
-    plus = 0
-    vloz = vklad
+
 
 def sql_obchod(kolik, poznamka, id):
     global ccactual, stav, maincurr, currency, plus
@@ -184,6 +185,10 @@ def nakupyo(kurz,zakolik,poznamka):
             ccpoint = kurz
             ccstart = kurz
 
+            stav = "nic"
+            plus = 0
+            vloz = vklad
+
 def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za kolik v maincurr, poznamka
     global prodejpri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
     print(str(datetime.datetime.now()) +" budem prodavat :  >" + str(zakolik) + " " + currency)
@@ -207,6 +212,9 @@ def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za k
             ccpoint = kurz
             ccstart = kurz
 
+            stav = "nic"
+            plus = 0
+            vloz = vklad
 
 def aktivni_objednavky():
     s = yobit_api.TradeApi(yobit_key, yobit_secret_key).get_active_orders(par)
@@ -226,7 +234,7 @@ def aktivni_objednavky():
 def tecka():
     global dot
     if dot >= 18:  # po 3 minutach udelej dalsi radek
-        print("po 3 minutach " +str(datetime.datetime.now()) + " : " + par + " : act >" + str(ccactual) + "<:")
+        print("po 18 teckach " +str(datetime.datetime.now()) + " : " + par + " : act >" + str(ccactual) + "<:")
         dot = 0
     dot += 1
     sys.stdout.write('.')
@@ -259,7 +267,7 @@ while run:
 
     tecka()
 
-    if (ccactual - ccpoint)  > (ccactual * provize):  # zvyseni stav ovice jak 0,4% - nastav prodej
+    if (ccactual - ccpoint)  >= (ccactual * provize):  # zvyseni stav ovice jak 0,4% - nastav prodej
         if stav=="prodej":  # pridat kontrolu stavu a upravu plusu
             plus += 1
         else:
@@ -268,7 +276,7 @@ while run:
         ccpoint = ccactual
         # zapis()
 
-    if (ccpoint - ccactual) > (ccactual * provize):  # snizeni stav o 0,4% - nakup
+    if (ccpoint - ccactual) >= (ccactual * provize):  # snizeni stav o 0,4% - nakup
         if stav=="nakup":
             plus += 1
         else:
@@ -287,12 +295,11 @@ while run:
            vloz = 0.8
 
     if stav == "prodej" and ccactual < cclast and (ccactual/ccstart)-1 > rozhodcibod :
-        if (stavlast == stav and ccactual > prodejpri) or stavlast != stav:
+        if (stavlast == stav and ccactual > nakuppri):
             actvol()
             print("naposledy nakoupeno za >" + str(nakuppri))
-            time.sleep(2)
+            time.sleep(1)
             if currencyvol > 0.0:
-                zapis("uskutecni prodej >")
                 if currencyvol * vloz > maxvkladcurr:
                     obchodza = maxvkladcurr
                 else:
@@ -303,28 +310,26 @@ while run:
     if stav == "nakup" and ccactual > cclast  and (ccstart/ccactual)-1 > rozhodcibod :
         actvol()
         print("naposledy prodano za >" + str(prodejpri))
-        time.sleep(2)
-        # for nabidka in aktivni_obchody(pair,"buy"):
-         #   print(" nabidka[0]> " + str(nabidka[0]) + " nabidka[1] > " + str(nabidka[1]))
-        if (stavlast == stav and ccactual < nakuppri) or stavlast != stav :
-            if maincurrvol > 0.0:
-            # if prodejpri == 0 or ccactual < prodejpri:
-                zapis("uskutecni nakup >")  # , str(aktivni_obchody(pair,"buy")))
+        time.sleep(1)
+        if (stavlast == stav and ccactual < prodejpri):
+            if maincurrvol * vloz > maxvkladmaincurr:
+                obchodza = maxvkladmaincurr
+            else:
+                obchodza = maincurrvol * vloz
+            if obchodza > minvkladmaincurr:
                 print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
-                nakup = (maincurrvol * vloz)  # /ccactual co se to tu deje
-                nakupyo(ccactual,nakup,"nakup pri zmene kurzu")
+                nakupyo(ccactual,obchodza,"nakup pri zmene kurzu")
 
     if ccactual != cclast:
         up = (ccstart / ccactual)
         down = (ccactual / ccstart)
         print("Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< rozhodcibod >" + str(rozhodcibod) + "< plus > " + str(plus))
 
-    if plus >= 1:  # mame zde plus nic aktivn2 neobchuduji, kouknemese na poptavky a nabidky do yobitu
+    if plus >= 1:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
         if stav == "prodej":
             time.sleep(1)
-            ostatninakup = aktivni_obchody(par,"buy")
             print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
-            for nakup in ostatninakup:
+            for nakup in aktivni_obchody(par,"buy"):
                 print(nakup[0], nakup[1])
                 if nakup[0] - ccstart  > ccactual * provize :
                     if nakup[1] <= currencyvol * vloz:  # prodava za mene, nez ja mohu nakupvat
@@ -338,20 +343,21 @@ while run:
 
         if stav == "nakup":
             time.sleep(1)
-            ostatniprodej = aktivni_obchody(par, "sell")
             print(" kurz je nizsi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou nakoupit ")
-            for prodej in ostatniprodej:
+            for prodej in aktivni_obchody(par, "sell"):
                 print(prodej[0], prodej[1])
                 if  ccstart - prodej[0] > ccactual * provize:
-                    nakup = (maincurrvol * vloz) / prodej[1]
+                    nakup = (maincurrvol * vloz)/prodej[0]  # dostavame nakup v crypto
                     if prodej[1] <= nakup:  # nakupuje za mene, nez ja mohu prodat
                         obchodza = prodej[1]
                     elif prodej[1] >= nakup:  # nakupuje za vice, nez ja mohu prodat
                         obchodza = nakup
-                    if obchodza > maxvkladmaincurr:
-                        obchodza = maxvkladmaincurr
-                    reset = "noreset"
-                    nakupyo(prodej[0],obchodza,"nakup z nabidky")
+                    if obchodza > maxvkladcurr:
+                        obchodza = maxvkladcurr
+                        if obchodza > minvkladmaincurr/prodej[0]:
+                        print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
+                        reset = "noreset"
+                        nakupyo(prodej[0],obchodza*prodej[0],"nakup z nabidky")
 
     cclast=ccactual  # nastavi predchozi kurz aktualnim
     time.sleep(delay)  # pocka nastavenou dobu
