@@ -20,7 +20,6 @@ minvkladcurr=0
 minvkladmaincurr=0.1  # minimalni vklad 0.1 USD
 obchodza = 0  # za kolik bude uskutecnen obchod
 
-
 # promenne pro muj algoritmus
 stav = 'nic'
 stavlast = 'nic'
@@ -355,9 +354,9 @@ while run:
                     if obchodza > maxvkladcurr:
                         obchodza = maxvkladcurr
                         if obchodza > minvkladmaincurr/prodej[0]:
-                        print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
-                        reset = "noreset"
-                        nakupyo(prodej[0],obchodza*prodej[0],"nakup z nabidky")
+                            print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
+                            reset = "noreset"
+                            nakupyo(prodej[0],obchodza*prodej[0],"nakup z nabidky")
 
     cclast=ccactual  # nastavi predchozi kurz aktualnim
     time.sleep(delay)  # pocka nastavenou dobu
