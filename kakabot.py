@@ -1,7 +1,7 @@
+import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys
+# pair
 maincurr = 'usd'  # usd-btc-doge-rur-eth-waves
-currency = 'xvg'  # doge, eth
-rozhodcibod = 0.01  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
-delay = 60  # spozdeni v sekundach
+currency = 'doge'  # doge, eth
 # yobit api
 yobit_key = 'key'
 yobit_secret_key = 'secret'
@@ -10,17 +10,22 @@ db = "kakabot"
 uzivatel = "root"
 heslo = "Pesfilipes.7"
 server = "127.0.0.1"
-vklad = 0.2  # kolik dat na jeden obchod z celkoveho mnozstvi
-provize = 0.0032  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
-maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
-maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
-minvkladcurr=0
-minvkladmaincurr=0.1  # minimalni vklad 0.1 USD
-obchodza = 0  # za kolik bude uskutecnen obchod
+
 
 # promenne pro muj algoritmus
-nakuppri=0.07742058  # abych neprodal levneji, nez nakoupil
-prodejpri=0.07742058  # abych nekoupil draz, nez prodal
+delay = 60  # spozdeni v sekundach
+rozhodcibod = 0.01  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
+nakuppri=0.00564989  # abych neprodal levneji, nez nakoupil
+prodejpri=0  # abych nekoupil draz, nez prodal
+vklad = 0.2  # kolik dat na jeden obchod z celkoveho mnozstvi
+provize = 0.004  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
+maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
+maxvkladmaincurr = 40  # maximalni vklad pro nakup currebncy v maincurr
+minvkladcurr=0
+nosecuremod = True
+
+minvkladmaincurr=0.1  # minimalni vklad 0.1 USD
+obchodza = 0  # za kolik bude uskutecnen obchod
 stav = 'nic'
 stavlast = 'nakup'
 ccactual = 0.00
@@ -38,12 +43,12 @@ reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccact
 
 run = True  # jestli se spusti program hodnota True / False
 
-def aktivni_obchody(menovypar,co):  # vybere 4 nejlepsi nabizene obchody na yobitu :menovypar "ltc_usd" :co sell/buy
+def aktivni_obchody(menovypar,co):  # vybere 3 nejlepsi nabizene obchody na yobitu :menovypar "ltc_usd" :co sell/buy
     mam = False
     navrat = 0
     while not mam:
         try:
-            link = "https://yobit.net/api/3/depth/" + menovypar + "?limit=4"
+            link = "https://yobit.net/api/3/depth/" + menovypar + "?limit=3"
             f = requests.get(link)
             nabidky = f.json().get(par).get('bids')
             poptavky = f.json().get(par).get('asks')
@@ -59,34 +64,40 @@ def aktivni_obchody(menovypar,co):  # vybere 4 nejlepsi nabizene obchody na yobi
 
 def actvol(*s):  # naplni  maincurrvol a currencyvol stavem z penezenky pokud s=="all" vypise vse v penezence
     global maincurrvol, currencyvol, maincurr, currency
-    dotaz = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).get_info()  # penezenky a stavy v json
-    account = dotaz.get('return')
-    wallet = account.get('funds')
-    for mena, count in wallet.items():
-        if (mena == maincurr):
-            maincurrvol = count
-        if (mena == currency):
-            currencyvol = count
-    print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
-    for i in s:
-        if s == "all":
-            for currency, count in wallet.items():
-                hodnota = yobit_api.PublicApi().get_pair_ticker(par)
-                print(currency.upper(), count, "prumer >" + str(hodnota.get('avg')) + " aktualne >" + str(
-                hodnota.get('last')) + " nakup >" + str(hodnota.get('buy')) + " prodej >" + str(
-                hodnota.get('sell')))
+    try:
+        dotaz = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).get_info()  # penezenky a stavy v json
+        account = dotaz.get('return')
+        wallet = account.get('funds')
+        for mena, count in wallet.items():
+            if (mena == maincurr):
+                maincurrvol = count
+            if (mena == currency):
+                currencyvol = count
+        print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
+        for i in s:
+            if s == "all":
+                for currency, count in wallet.items():
+                    hodnota = yobit_api.PublicApi().get_pair_ticker(par)
+                    print(currency.upper(), count, "prumer >" + str(hodnota.get('avg')) + " aktualne >" + str(
+                    hodnota.get('last')) + " nakup >" + str(hodnota.get('buy')) + " prodej >" + str(
+                    hodnota.get('sell')))
+    except:
+        print('Nastala neočekávaná chyba v actvol')
 
 def nacti():  # nacte hodnotu cc
     global ccpoint, ccactual, ccstart, maxvkladcurr
-    hodnota = yobit_api.PublicApi().get_pair_ticker(pair=par)
-    ccactual = hodnota.get('last')
-    maxvkladcurr = maxvkladmaincurr / ccactual
-    # {'high': 603.3402, 'low': 481.50898705,
-    # 'avg': 542.42459352, 'vol': 566012.01104146, 'vol_cur': 1082.91016055,
-    # 'last': 532.42971141, 'buy': 530.92620723, 'sell': 532.42971141, 'updated': 1521406380}
-    if (ccpoint == 0):  # prvotni nastaveni ccpoint
-        ccpoint = ccactual
-        ccstart = ccactual
+    try:
+        hodnota = yobit_api.PublicApi().get_pair_ticker(pair=par)
+        ccactual = hodnota.get('last')
+        maxvkladcurr = maxvkladmaincurr / ccactual
+        # {'high': 603.3402, 'low': 481.50898705,
+        # 'avg': 542.42459352, 'vol': 566012.01104146, 'vol_cur': 1082.91016055,
+        # 'last': 532.42971141, 'buy': 530.92620723, 'sell': 532.42971141, 'updated': 1521406380}
+        if (ccpoint == 0):  # prvotni nastaveni ccpoint
+            ccpoint = ccactual
+            ccstart = ccactual
+    except:
+        print('Nastala neocekavana chyba v nacti')
 
 def zapis(*s):
     global ccpoint,stav,plus,vloz,vklad
@@ -162,7 +173,7 @@ def nakupyo(kurz,zakolik,poznamka):
     nakup = zakolik  / kurz
     print(str(datetime.datetime.now()) +" budem nakupovat : " + currency + " za >" + str(zakolik) + " " + maincurr)
     print(nakup)
-    if prodejpri > kurz:
+    if prodejpri > kurz or nosecuremod:
         odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).buy(par, kurz, nakup)
         print(odpoved)
         o = json.loads(json.dumps(odpoved))
@@ -192,7 +203,7 @@ def nakupyo(kurz,zakolik,poznamka):
 def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za kolik v maincurr, poznamka
     global prodejpri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
     print(str(datetime.datetime.now()) +" budem prodavat :  >" + str(zakolik) + " " + currency)
-    if nakuppri < kurz:
+    if nakuppri < kurz or nosecuremod:
         odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(par, kurz, zakolik)
         print(odpoved)
         o = json.loads(json.dumps(odpoved))
@@ -264,12 +275,16 @@ if ccactual < prodejpri and ccactual > nakuppri:
 vloz = vklad
 print("< rozhodcibod >" + str(rozhodcibod))
 while run:
-    reset = "yes"
     try:
         nacti()
     except Exception:
         time.sleep(10)
         continue
+
+    if reset == "noreset":  # do3lo k nakupu / prodeji z nabidek bylo plus
+        stav = "nic"
+        plus = 0
+        reset = "yes"
 
     tecka()
 
@@ -289,6 +304,10 @@ while run:
             stav="nakup"
             plus = 0
         ccpoint = ccactual
+
+    if ((ccactual - ccstart) > 0 and (ccactual - ccstart) < (ccactual * provize)) or ((ccstart - ccactual) > 0 and (ccstart - ccactual) < (ccactual * provize)):  # zvyseni stav ovice jak 0,4% - nastav prodej
+        stav = "nic"
+        plus = 0
 
     if plus != 0:
         if plus == 1:
@@ -325,8 +344,8 @@ while run:
             nakupyo(ccactual,obchodza,"nakup pri zmene kurzu")
 
     if ccactual != cclast:
-        up = (ccstart / ccactual)
-        down = (ccactual / ccstart)
+        up = (ccpoint / ccactual)
+        down = (ccactual / ccpoint)
         print(str(datetime.datetime.now().hour) + ":" + str(datetime.datetime.now().minute)+ " Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< plus > " + str(plus) + " < stav > " + stav)
 
     if plus >= 1:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
