@@ -11,18 +11,17 @@ uzivatel = "root"
 heslo = "Pesfilipes.7"
 server = "127.0.0.1"
 
-
 # promenne pro muj algoritmus
 delay = 60  # spozdeni v sekundach
 rozhodcibod = 0.01  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
-nakuppri=0.00564989  # abych neprodal levneji, nez nakoupil
+nakuppri=0.0651342  # abych neprodal levneji, nez nakoupil
 prodejpri=0  # abych nekoupil draz, nez prodal
 vklad = 0.2  # kolik dat na jeden obchod z celkoveho mnozstvi
-provize = 0.004  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
+provize = 0.005  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
 maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
-maxvkladmaincurr = 40  # maximalni vklad pro nakup currebncy v maincurr
+maxvkladmaincurr = 66  # maximalni vklad pro nakup currebncy v maincurr
 minvkladcurr=0
-nosecuremod = True
+nosecuremod = True  # tady neberu v pota nakupy a prodeje pokud je True
 
 minvkladmaincurr=0.1  # minimalni vklad 0.1 USD
 obchodza = 0  # za kolik bude uskutecnen obchod
@@ -362,7 +361,10 @@ while run:
                     if obchodza > maxvkladcurr:
                         obchodza = maxvkladcurr
                     reset = "noreset"
-                    prodejyo(nakup[0],obchodza,"prodej z nabidky")
+                    if obchodza > minvkladmaincurr:
+                        prodejyo(nakup[0],obchodza,"prodej z nabidky")
+                    else:
+                        print('nedosazeno minimalniho mnozstvi k prodeji')
 
         if stav == "nakup":
             time.sleep(1)
@@ -379,16 +381,13 @@ while run:
                         obchodza = maxvkladcurr
                     print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
                     reset = "noreset"
-                    nakupyo(prodej[0],obchodza*prodej[0],"nakup z nabidky")
+                    if obchodza*prodej[0] > minvkladmaincurr:
+                        nakupyo(prodej[0],obchodza*prodej[0],"nakup z nabidky")
+                    else:
+                        print('není za co nakupovat')
 
     cclast=ccactual  # nastavi predchozi kurz aktualnim
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
 
-# doge >> 11590.50248718 : usd >> 32.90711086 . 27.3.2018 19:30
-
-print(aktivni_obchody(par,"prodej"))
-print(aktivni_obchody(par,"nakup"))
-
-# 10.4.14:13 xvg >> 1378.18652353 : usd >> 54.09880827 .
