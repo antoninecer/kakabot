@@ -13,15 +13,16 @@ server = "127.0.0.1"
 
 # promenne pro muj algoritmus
 delay = 60  # spozdeni v sekundach
-rozhodcibod = 0.01  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
-nakuppri=0.0651342  # abych neprodal levneji, nez nakoupil
+rozhodcibod = 0.015  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
+nakuppri=0 # abych neprodal levneji, nez nakoupil
 prodejpri=0  # abych nekoupil draz, nez prodal
 vklad = 0.2  # kolik dat na jeden obchod z celkoveho mnozstvi
-provize = 0.005  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
+provize = 0.007  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
 maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
-maxvkladmaincurr = 66  # maximalni vklad pro nakup currebncy v maincurr
+maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
 minvkladcurr=0
-nosecuremod = True  # tady neberu v pota nakupy a prodeje pokud je True
+nosecuremod = False  # True  # tady neberu v pota nakupy a prodeje pokud je True
+looktooffers=True
 
 minvkladmaincurr=0.1  # minimalni vklad 0.1 USD
 obchodza = 0  # za kolik bude uskutecnen obchod
@@ -88,6 +89,8 @@ def nacti():  # nacte hodnotu cc
     try:
         hodnota = yobit_api.PublicApi().get_pair_ticker(pair=par)
         ccactual = hodnota.get('last')
+        if ccactual is None:
+            ccactual = cclast
         maxvkladcurr = maxvkladmaincurr / ccactual
         # {'high': 603.3402, 'low': 481.50898705,
         # 'avg': 542.42459352, 'vol': 566012.01104146, 'vol_cur': 1082.91016055,
@@ -347,7 +350,7 @@ while run:
         down = (ccactual / ccpoint)
         print(str(datetime.datetime.now().hour) + ":" + str(datetime.datetime.now().minute)+ " Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< plus > " + str(plus) + " < stav > " + stav)
 
-    if plus >= 1:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
+    if plus >= 1 and looktooffers:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
         if stav == "prodej":
             time.sleep(1)
             print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
@@ -390,4 +393,3 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
-
