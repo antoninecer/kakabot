@@ -8,26 +8,28 @@ yobit_secret_key = 'secret'
 # access to databaze
 db = "kakabot"
 uzivatel = "root"
-heslo = "Pesfilipes.7"
+heslo = "Password"
 server = "127.0.0.1"
 
+
 # promenne pro muj algoritmus
-delay = 60  # spozdeni v sekundach
-rozhodcibod = 0.015  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
+delay = 120  # spozdeni v sekundach
+rozhodcibod = 0.012  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
 nakuppri=0 # abych neprodal levneji, nez nakoupil
 prodejpri=0  # abych nekoupil draz, nez prodal
 vklad = 0.2  # kolik dat na jeden obchod z celkoveho mnozstvi
-provize = 0.007  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
+provize = 0.005  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
 maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
 maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
 minvkladcurr=0
 nosecuremod = False  # True  # tady neberu v pota nakupy a prodeje pokud je True
-looktooffers=True
+looktooffers = True  # jestli se koukat do nabidek a nejet jen na spicky
+fullhouse = False  # jestli ma obchodovat se vsim co ma do vyse
 
 minvkladmaincurr=0.1  # minimalni vklad 0.1 USD
 obchodza = 0  # za kolik bude uskutecnen obchod
 stav = 'nic'
-stavlast = 'nakup'
+stavlast = 'nic'
 ccactual = 0.00
 cclast = 0.00
 ccpoint = 0.00
@@ -311,13 +313,16 @@ while run:
         stav = "nic"
         plus = 0
 
-    if plus != 0:
+    if plus != 0 and not fullhouse:
         if plus == 1:
-            vloz = 0.3
+            vloz = vklad * 1.5  # pri vklad = 0.2 je to 0.3
         elif plus == 2:
-          vloz = 0.4
+          vloz = vklad * 2  # pri vklad = 0.2 je to 0.4
         elif plus >=3:
-           vloz = 0.5
+           vloz = vklad * 2.5  # pri vklad = 0.2 je to 0.5
+
+    if fullhouse:  #budeme obchodovat se všímm do výše maxvkladcurr
+        vloz = 1
 
 
     if stav == "prodej" and ccactual < cclast and (ccactual/ccstart)-1 > rozhodcibod :
@@ -393,3 +398,4 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
+
