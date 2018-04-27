@@ -1,24 +1,33 @@
 import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys
-
+# pair
 maincurr = 'usd'  # usd-btc-doge-rur-eth-waves
 currency = 'doge'  # doge, eth
-rozhodcibod = 0.007236  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
-delay = 10  # spozdeni v sekundach
 # yobit api
 yobit_key = 'key'
 yobit_secret_key = 'secret'
 # access to databaze
 db = "kakabot"
 uzivatel = "root"
-heslo = "Pesfilipes.7"
+heslo = "password"
 server = "127.0.0.1"
-vklad = 0.45  # kolik dat na jeden obchod z celkoveho mnozstvi
-provize = 0.003618  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
-maxvkladcurr = 0  # maximalni vklad na jeden prodej currency musim propocist z maincurr
-maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
-obchodza = 0  # za kolik bude uskutecnen obchod
+
 
 # promenne pro muj algoritmus
+delay = 120  # spozdeni v sekundach
+rozhodcibod = 0.012  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
+nakuppri=0 # abych neprodal levneji, nez nakoupil
+prodejpri=0  # abych nekoupil draz, nez prodal
+vklad = 0.2  # kolik dat na jeden obchod z celkoveho mnozstvi
+provize = 0.005  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
+maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
+maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
+minvkladcurr=0
+nosecuremod = False  # True  # tady neberu v pota nakupy a prodeje pokud je True
+looktooffers = True  # jestli se koukat do nabidek a nejet jen na spicky
+fullhouse = False  # jestli ma obchodovat se vsim co ma do vyse
+
+minvkladmaincurr=0.1  # minimalni vklad 0.1 USD
+obchodza = 0  # za kolik bude uskutecnen obchod
 stav = 'nic'
 stavlast = 'nic'
 ccactual = 0.00
@@ -26,8 +35,6 @@ cclast = 0.00
 ccpoint = 0.00
 ccstart = 0.0
 plus = 0  # zvysovat hodnoty kdyz se opakuje prodej prodej, nebo nakup nakup po sobe pro vice nakupu/prodeje
-nakuppri=0.00  # abych neprodal levneji, nez nakoupil
-prodejpri=0.00  # abych nekoupil draz, nez prodal
 maincurrvol = 0.00  # nacte z penezenky
 currencyvol = 0.00  # nacte z penezenky
 par = currency + '_' + maincurr
@@ -38,12 +45,12 @@ reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccact
 
 run = True  # jestli se spusti program hodnota True / False
 
-def aktivni_obchody(menovypar,co):  # vybere 4 nejlepsi nabizene obchody na yobitu :menovypar "ltc_usd" :co sell/buy
+def aktivni_obchody(menovypar,co):  # vybere 3 nejlepsi nabizene obchody na yobitu :menovypar "ltc_usd" :co sell/buy
     mam = False
     navrat = 0
     while not mam:
         try:
-            link = "https://yobit.net/api/3/depth/" + menovypar + "?limit=4"
+            link = "https://yobit.net/api/3/depth/" + menovypar + "?limit=3"
             f = requests.get(link)
             nabidky = f.json().get(par).get('bids')
             poptavky = f.json().get(par).get('asks')
@@ -59,34 +66,42 @@ def aktivni_obchody(menovypar,co):  # vybere 4 nejlepsi nabizene obchody na yobi
 
 def actvol(*s):  # naplni  maincurrvol a currencyvol stavem z penezenky pokud s=="all" vypise vse v penezence
     global maincurrvol, currencyvol, maincurr, currency
-    dotaz = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).get_info()  # penezenky a stavy v json
-    account = dotaz.get('return')
-    wallet = account.get('funds')
-    for mena, count in wallet.items():
-        if (mena == maincurr):
-            maincurrvol = count
-        if (mena == currency):
-            currencyvol = count
-    print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
-    for i in s:
-        if s == "all":
-            for currency, count in wallet.items():
-                hodnota = yobit_api.PublicApi().get_pair_ticker(par)
-                print(currency.upper(), count, "prumer >" + str(hodnota.get('avg')) + " aktualne >" + str(
-                hodnota.get('last')) + " nakup >" + str(hodnota.get('buy')) + " prodej >" + str(
-                hodnota.get('sell')))
+    try:
+        dotaz = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).get_info()  # penezenky a stavy v json
+        account = dotaz.get('return')
+        wallet = account.get('funds')
+        for mena, count in wallet.items():
+            if (mena == maincurr):
+                maincurrvol = count
+            if (mena == currency):
+                currencyvol = count
+        print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
+        for i in s:
+            if s == "all":
+                for currency, count in wallet.items():
+                    hodnota = yobit_api.PublicApi().get_pair_ticker(par)
+                    print(currency.upper(), count, "prumer >" + str(hodnota.get('avg')) + " aktualne >" + str(
+                    hodnota.get('last')) + " nakup >" + str(hodnota.get('buy')) + " prodej >" + str(
+                    hodnota.get('sell')))
+    except:
+        print('Nastala neočekávaná chyba v actvol')
 
 def nacti():  # nacte hodnotu cc
     global ccpoint, ccactual, ccstart, maxvkladcurr
-    hodnota = yobit_api.PublicApi().get_pair_ticker(pair=par)
-    ccactual = hodnota.get('last')
-    maxvkladcurr = maxvkladmaincurr / ccactual
-    # {'high': 603.3402, 'low': 481.50898705,
-    # 'avg': 542.42459352, 'vol': 566012.01104146, 'vol_cur': 1082.91016055,
-    # 'last': 532.42971141, 'buy': 530.92620723, 'sell': 532.42971141, 'updated': 1521406380}
-    if (ccpoint == 0):  # prvotni nastaveni ccpoint
-        ccpoint = ccactual
-        ccstart = ccactual
+    try:
+        hodnota = yobit_api.PublicApi().get_pair_ticker(pair=par)
+        ccactual = hodnota.get('last')
+        if ccactual is None:
+            ccactual = cclast
+        maxvkladcurr = maxvkladmaincurr / ccactual
+        # {'high': 603.3402, 'low': 481.50898705,
+        # 'avg': 542.42459352, 'vol': 566012.01104146, 'vol_cur': 1082.91016055,
+        # 'last': 532.42971141, 'buy': 530.92620723, 'sell': 532.42971141, 'updated': 1521406380}
+        if (ccpoint == 0):  # prvotni nastaveni ccpoint
+            ccpoint = ccactual
+            ccstart = ccactual
+    except:
+        print('Nastala neocekavana chyba v nacti')
 
 def zapis(*s):
     global ccpoint,stav,plus,vloz,vklad
@@ -98,9 +113,7 @@ def zapis(*s):
     file.write(sestav_vetu())
     file.close()
     ccpoint = ccactual
-    stav = "nic"
-    plus = 0
-    vloz = vklad
+
 
 def sql_obchod(kolik, poznamka, id):
     global ccactual, stav, maincurr, currency, plus
@@ -164,48 +177,62 @@ def nakupyo(kurz,zakolik,poznamka):
     nakup = zakolik  / kurz
     print(str(datetime.datetime.now()) +" budem nakupovat : " + currency + " za >" + str(zakolik) + " " + maincurr)
     print(nakup)
-    odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).buy(par, kurz, nakup)
-    print(odpoved)
-    o = json.loads(json.dumps(odpoved))
-    print(o["success"])
-    if o["success"] == 1:  #podařilo se zadat nabídku na prodej do yobit
-        re = json.loads(json.dumps(o["return"]))
-        print(re["order_id"])
-        print(re["server_time"])
-        zapis("nakup " + str(kurz) + " za " + str(zakolik) + " " + maincurr)
-        sql_obchod(str(nakup), str(poznamka), re["order_id"])
-        fu = json.loads(json.dumps(re["funds"]))  # aktualizuji currencyvol a maincurrvol
-        maincurrvol = fu[maincurr]
-        currencyvol = fu[currency]
-        nakuppri = kurz
-        if reset == "noreset":
-            print("neresetuji promenne ccpoint a ccstart")
-        else:
-            ccpoint = kurz
-            ccstart = kurz
+    if prodejpri > kurz or nosecuremod:
+        odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).buy(par, kurz, nakup)
+        print(odpoved)
+        o = json.loads(json.dumps(odpoved))
+        print(o["success"])
+        if o["success"] == 1:  #podařilo se zadat nabídku na prodej do yobit
+            re = json.loads(json.dumps(o["return"]))
+        #    print(re["order_id"])
+        #   print(re["server_time"])
+            zapis("nakup " + str(kurz) + " za " + str(zakolik) + " " + maincurr)
+            sql_obchod(str(nakup), str(poznamka), re["order_id"])
+            fu = json.loads(json.dumps(re["funds"]))  # aktualizuji currencyvol a maincurrvol
+            maincurrvol = fu[maincurr]
+            currencyvol = fu[currency]
+            nakuppri = kurz
+            if reset == "noreset":
+                print("neresetuji promenne ccpoint a ccstart")
+            else:
+                ccpoint = kurz
+                ccstart = kurz
+                stav = "nic"
+                plus = 0
+                vloz = vklad
+    else:
+        odpoved = "toto neprovedu, jelikoz posledni nakup byl za " + str(nakuppri) + " a te+d chci nakupovat za " + str(kurz)
+        print(odpoved)
 
 def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za kolik v maincurr, poznamka
     global prodejpri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
     print(str(datetime.datetime.now()) +" budem prodavat :  >" + str(zakolik) + " " + currency)
-    odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(par, kurz, zakolik)
-    print(odpoved)
-    o = json.loads(json.dumps(odpoved))
-    print(o["success"])
-    if o["success"] == 1:  #podařilo se zadat nabídku na prodej do yobit
-        re = json.loads(json.dumps(o["return"]))
-        print(re["order_id"])
-        print(re["server_time"])
-        zapis("prodej v kurzu" + str(kurz) + " za " + str(zakolik) + " " + currency)
-        sql_obchod(str(zakolik), str(poznamka), re["order_id"])
-        fu = json.loads(json.dumps(re["funds"]))  # aktualizuji currencyvol a maincurrvol
-        maincurrvol = fu[maincurr]
-        currencyvol = fu[currency]
-        prodejpri = kurz
-        if reset == "noreset":
-            print("neresetuji promenne ccpoint a ccstart")
-        else:
-            ccpoint = kurz
-            ccstart = kurz
+    if nakuppri < kurz or nosecuremod:
+        odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(par, kurz, zakolik)
+        print(odpoved)
+        o = json.loads(json.dumps(odpoved))
+        print(o["success"])
+        if o["success"] == 1:  #podařilo se zadat nabídku na prodej do yobit
+            re = json.loads(json.dumps(o["return"]))
+            # print(re["order_id"])
+            # print(re["server_time"])
+            zapis("prodej v kurzu" + str(kurz) + " za " + str(zakolik) + " " + currency)
+            sql_obchod(str(zakolik), str(poznamka), re["order_id"])
+            fu = json.loads(json.dumps(re["funds"]))  # aktualizuji currencyvol a maincurrvol
+            maincurrvol = fu[maincurr]
+            currencyvol = fu[currency]
+            prodejpri = kurz
+            if reset == "noreset":
+                print("neresetuji promenne ccpoint a ccstart")
+            else:
+                ccpoint = kurz
+                ccstart = kurz
+                stav = "nic"
+                plus = 0
+                vloz = vklad
+    else:
+        odpoved = "toto neprovedu, jelikoz posledni prodej byl za " + str(prodejpri) + " a ted chci nakupovat za " + str(kurz)
+        print(odpoved)
 
 
 def aktivni_objednavky():
@@ -226,7 +253,7 @@ def aktivni_objednavky():
 def tecka():
     global dot
     if dot >= 18:  # po 3 minutach udelej dalsi radek
-        print("po 3 minutach " +str(datetime.datetime.now()) + " : " + par + " : act >" + str(ccactual) + "<:")
+        print("po 18 teckach " +str(datetime.datetime.now()) + " : " + par + " : act >" + str(ccactual) + "<:")
         dot = 0
     dot += 1
     sys.stdout.write('.')
@@ -235,8 +262,10 @@ def tecka():
 
 # zacatek programu - nacteme udaje z penezenky a kouknem za kolik jsme naposled nakoupili a prodali
 actvol()
-nakuppri=sql_posledni("nakup")
-prodejpri=sql_posledni("prodej")
+if nakuppri == 0:
+    nakuppri=sql_posledni("nakup")
+if prodejpri == 0:
+    prodejpri=sql_posledni("prodej")
 stavlast=sql_last_stav()
 print("posledni nakup>" + str(nakuppri))
 print("posledni prodej>" + str(prodejpri))
@@ -248,18 +277,22 @@ if ccactual < prodejpri and ccactual > nakuppri:
     # kurz je mezi nakupem a prodejem
 """
 vloz = vklad
-
+print("< rozhodcibod >" + str(rozhodcibod))
 while run:
-    reset = "yes"
     try:
         nacti()
     except Exception:
         time.sleep(10)
         continue
 
+    if reset == "noreset":  # do3lo k nakupu / prodeji z nabidek bylo plus
+        stav = "nic"
+        plus = 0
+        reset = "yes"
+
     tecka()
 
-    if (ccactual - ccpoint)  > (ccactual * provize):  # zvyseni stav ovice jak 0,4% - nastav prodej
+    if (ccactual - ccpoint)  >= (ccactual * provize):  # zvyseni stav ovice jak 0,4% - nastav prodej
         if stav=="prodej":  # pridat kontrolu stavu a upravu plusu
             plus += 1
         else:
@@ -268,7 +301,7 @@ while run:
         ccpoint = ccactual
         # zapis()
 
-    if (ccpoint - ccactual) > (ccactual * provize):  # snizeni stav o 0,4% - nakup
+    if (ccpoint - ccactual) >= (ccactual * provize):  # snizeni stav o 0,4% - nakup
         if stav=="nakup":
             plus += 1
         else:
@@ -276,23 +309,28 @@ while run:
             plus = 0
         ccpoint = ccactual
 
-    if plus != 0:
+    if ((ccactual - ccstart) > 0 and (ccactual - ccstart) < (ccactual * provize)) or ((ccstart - ccactual) > 0 and (ccstart - ccactual) < (ccactual * provize)):  # zvyseni stav ovice jak 0,4% - nastav prodej
+        stav = "nic"
+        plus = 0
+
+    if plus != 0 and not fullhouse:
         if plus == 1:
-            vloz = 0.6
+            vloz = vklad * 1.5  # pri vklad = 0.2 je to 0.3
         elif plus == 2:
-          vloz = 0.66
-        elif plus >=3 and plus <=4:
-           vloz = 0.7
-        elif plus >= 5:
-           vloz = 0.8
+          vloz = vklad * 2  # pri vklad = 0.2 je to 0.4
+        elif plus >=3:
+           vloz = vklad * 2.5  # pri vklad = 0.2 je to 0.5
+
+    if fullhouse:  #budeme obchodovat se všímm do výše maxvkladcurr
+        vloz = 1
+
 
     if stav == "prodej" and ccactual < cclast and (ccactual/ccstart)-1 > rozhodcibod :
-        if (stavlast == stav and ccactual > prodejpri) or stavlast != stav:
+        print("naposledy nakoupeno za >" + str(nakuppri) + " stavlast > " + stavlast + " aktualni kurz > " + str(ccactual))
+        if ccactual > nakuppri:
             actvol()
-            print("naposledy nakoupeno za >" + str(nakuppri))
-            time.sleep(2)
+            time.sleep(1)
             if currencyvol > 0.0:
-                zapis("uskutecni prodej >")
                 if currencyvol * vloz > maxvkladcurr:
                     obchodza = maxvkladcurr
                 else:
@@ -302,29 +340,26 @@ while run:
 
     if stav == "nakup" and ccactual > cclast  and (ccstart/ccactual)-1 > rozhodcibod :
         actvol()
-        print("naposledy prodano za >" + str(prodejpri))
-        time.sleep(2)
-        # for nabidka in aktivni_obchody(pair,"buy"):
-         #   print(" nabidka[0]> " + str(nabidka[0]) + " nabidka[1] > " + str(nabidka[1]))
-        if (stavlast == stav and ccactual < nakuppri) or stavlast != stav :
-            if maincurrvol > 0.0:
-            # if prodejpri == 0 or ccactual < prodejpri:
-                zapis("uskutecni nakup >")  # , str(aktivni_obchody(pair,"buy")))
-                print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
-                nakup = (maincurrvol * vloz)  # /ccactual co se to tu deje
-                nakupyo(ccactual,nakup,"nakup pri zmene kurzu")
+        print("naposledy prodano za > " + str(prodejpri) + " stavlast > " + stavlast + " aktualni kurz > " + str(ccactual))
+        time.sleep(1)
+        if (stavlast == stav and ccactual < prodejpri):
+            if maincurrvol * vloz > maxvkladmaincurr:
+                obchodza = maxvkladmaincurr
+            else:
+                obchodza = maincurrvol * vloz
+            print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
+            nakupyo(ccactual,obchodza,"nakup pri zmene kurzu")
 
     if ccactual != cclast:
-        up = (ccstart / ccactual)
-        down = (ccactual / ccstart)
-        print("Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< rozhodcibod >" + str(rozhodcibod) + "< plus > " + str(plus))
+        up = (ccpoint / ccactual)
+        down = (ccactual / ccpoint)
+        print(str(datetime.datetime.now().hour) + ":" + str(datetime.datetime.now().minute)+ " Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< plus > " + str(plus) + " < stav > " + stav)
 
-    if plus >= 1:  # mame zde plus nic aktivn2 neobchuduji, kouknemese na poptavky a nabidky do yobitu
+    if plus >= 1 and looktooffers:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
         if stav == "prodej":
             time.sleep(1)
-            ostatninakup = aktivni_obchody(par,"buy")
             print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
-            for nakup in ostatninakup:
+            for nakup in aktivni_obchody(par,"buy"):
                 print(nakup[0], nakup[1])
                 if nakup[0] - ccstart  > ccactual * provize :
                     if nakup[1] <= currencyvol * vloz:  # prodava za mene, nez ja mohu nakupvat
@@ -334,26 +369,33 @@ while run:
                     if obchodza > maxvkladcurr:
                         obchodza = maxvkladcurr
                     reset = "noreset"
-                    prodejyo(nakup[0],obchodza,"prodej z nabidky")
+                    if obchodza > minvkladmaincurr:
+                        prodejyo(nakup[0],obchodza,"prodej z nabidky")
+                    else:
+                        print('nedosazeno minimalniho mnozstvi k prodeji')
 
         if stav == "nakup":
             time.sleep(1)
-            ostatniprodej = aktivni_obchody(par, "sell")
             print(" kurz je nizsi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou nakoupit ")
-            for prodej in ostatniprodej:
+            for prodej in aktivni_obchody(par, "sell"):
                 print(prodej[0], prodej[1])
                 if  ccstart - prodej[0] > ccactual * provize:
-                    nakup = (maincurrvol * vloz) / prodej[1]
+                    nakup = (maincurrvol * vloz)/prodej[0]  # dostavame nakup v crypto
                     if prodej[1] <= nakup:  # nakupuje za mene, nez ja mohu prodat
                         obchodza = prodej[1]
                     elif prodej[1] >= nakup:  # nakupuje za vice, nez ja mohu prodat
                         obchodza = nakup
-                    if obchodza > maxvkladmaincurr:
-                        obchodza = maxvkladmaincurr
+                    if obchodza > maxvkladcurr:
+                        obchodza = maxvkladcurr
+                    print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
                     reset = "noreset"
-                    nakupyo(prodej[0],obchodza,"nakup z nabidky")
+                    if obchodza*prodej[0] > minvkladmaincurr:
+                        nakupyo(prodej[0],obchodza*prodej[0],"nakup z nabidky")
+                    else:
+                        print('není za co nakupovat')
 
     cclast=ccactual  # nastavi predchozi kurz aktualnim
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
+
