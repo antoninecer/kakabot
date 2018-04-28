@@ -1,4 +1,5 @@
-import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys
+import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys, smtplib
+
 # pair
 maincurr = 'usd'  # usd-btc-doge-rur-eth-waves
 currency = 'doge'  # doge, eth
@@ -8,9 +9,13 @@ yobit_secret_key = 'secret'
 # access to databaze
 db = "kakabot"
 uzivatel = "root"
-heslo = "Password"
+heslo = "Pesfilipes.7"
 server = "127.0.0.1"
-
+# napojeni mailu
+fromaddr = 'rkakabot@gmail.com'
+toaddrs = 'antoninecer@gmail.com'
+musername = 'rkakabot@gmail.com'
+mpassword = 'tajneheslo'
 
 # promenne pro muj algoritmus
 delay = 120  # spozdeni v sekundach
@@ -22,7 +27,7 @@ provize = 0.005  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde te
 maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
 maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
 minvkladcurr=0
-nosecuremod = False  # True  # tady neberu v pota nakupy a prodeje pokud je True
+nosecuremod = True  # True  # tady neberu v pota nakupy a prodeje pokud je True
 looktooffers = True  # jestli se koukat do nabidek a nejet jen na spicky
 fullhouse = False  # jestli ma obchodovat se vsim co ma do vyse
 
@@ -44,6 +49,21 @@ dot = 0  # tecka
 reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccactual (kdyz vybiram z nabidek, tak nemohu resetovat reset = "noreset")
 
 run = True  # jestli se spusti program hodnota True / False
+
+def sendmail(subject, msg):
+    global fromaddr, toaddrs, musername, mpassword
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.ehlo()
+        message = 'Subject: {}\n\n{}'.format(subject, msg)
+        server.login(musername, mpassword)
+
+        server.sendmail(fromaddr, toaddrs, msg)
+        server.quit()
+        # ...send emails
+    except:
+        print('Something went wrong...')
+
 
 def aktivni_obchody(menovypar,co):  # vybere 3 nejlepsi nabizene obchody na yobitu :menovypar "ltc_usd" :co sell/buy
     mam = False
@@ -292,6 +312,9 @@ while run:
 
     tecka()
 
+    if abs(ccstart - ccactual) > ((ccactual/100)*2):
+        sendmail('prekroceny 2%','start: '+str(ccstart)+' aktualni: '+str(ccactual))
+
     if (ccactual - ccpoint)  >= (ccactual * provize):  # zvyseni stav ovice jak 0,4% - nastav prodej
         if stav=="prodej":  # pridat kontrolu stavu a upravu plusu
             plus += 1
@@ -398,4 +421,3 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
-
