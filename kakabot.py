@@ -9,7 +9,7 @@ yobit_secret_key = 'secret'
 # access to databaze
 db = "kakabot"
 uzivatel = "root"
-heslo = "Pesfilipes.7"
+heslo = "sqlheslo"
 server = "127.0.0.1"
 # napojeni mailu
 fromaddr = 'rkakabot@gmail.com'
