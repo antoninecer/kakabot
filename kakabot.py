@@ -9,25 +9,25 @@ yobit_secret_key = 'secret'
 # access to databaze
 db = "kakabot"
 uzivatel = "root"
-heslo = "sqlheslo"
+heslo = "heslo"
 server = "127.0.0.1"
 # napojeni mailu
 fromaddr = 'rkakabot@gmail.com'
 toaddrs = 'antoninecer@gmail.com'
 musername = 'rkakabot@gmail.com'
-mpassword = 'tajneheslo'
+mpassword = 'RoboKaka1'
 
 # promenne pro muj algoritmus
 delay = 120  # spozdeni v sekundach
-rozhodcibod = 0.012  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
+rozhodcibod = 0.008 # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
 nakuppri=0 # abych neprodal levneji, nez nakoupil
 prodejpri=0  # abych nekoupil draz, nez prodal
 vklad = 0.2  # kolik dat na jeden obchod z celkoveho mnozstvi
-provize = 0.005  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
+provize = 0.004  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
 maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
 maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
 minvkladcurr=0
-nosecuremod = True  # True  # tady neberu v pota nakupy a prodeje pokud je True
+nosecuremod = False  # True  # tady neberu v pota nakupy a prodeje pokud je True
 looktooffers = True  # jestli se koukat do nabidek a nejet jen na spicky
 fullhouse = False  # jestli ma obchodovat se vsim co ma do vyse
 
@@ -46,9 +46,15 @@ par = currency + '_' + maincurr
 ostatniprodej = 0
 ostatninakup = 0
 dot = 0  # tecka
+dnesniprumerkurznakup = 0
+dnesniprumerkurzprodej = 0
+dnesnakoupenocc = 0
+dnesprodanocc = 0
+dnesnakoupenomaincurr = 0
+dnesprodanomaincurr = 0
 reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccactual (kdyz vybiram z nabidek, tak nemohu resetovat reset = "noreset")
 
-run = True  # jestli se spusti program hodnota True / False
+run = True  # True  # jestli se spusti program hodnota True / False
 
 def sendmail(subject, msg):
     global fromaddr, toaddrs, musername, mpassword
@@ -174,18 +180,37 @@ def sql_last_stav():
         return 'nic'
     cnx.close()
 
-def sql_suma_dnes(stav, jak):  # vrati kolik dnes bylo za stav obchodovano
-    global ccactual, currency, maincurr
-    cnx = mysql.connector.connect(user=uzivatel, password=heslo, host=server, database=db)
-    x = cnx.cursor()
-    veta = "select sum(kolik) from kakabot.kakabot where date(cast(cas as datetime)) = curdate() and stav = '" + str(stav) + "' and kurz " + jak + str(ccactual) + " and currency ='" + currency +"' and maincurr ='" + maincurr + "';"
-    print(veta)
+def sql_suma_dnes():  # vrati kolik dnes bylo za stav obchodovano
+    global ccactual, currency, maincurr,dnesniprumerkurzprodej,dnesprodanocc,dnesprodanomaincurr,dnesniprumerkurznakup,dnesnakoupenocc,dnesnakoupenomaincurr
     try:
+        cnx = mysql.connector.connect(user=uzivatel, password=heslo, host=server, database=db)
+        x = cnx.cursor()
+        stav = "prodej"
+        veta = "select stav,sum(za)/sum(kolik) as kurz, sum(kolik) as cc, sum(za) as za from (select stav,kolik, kurz * kolik as za from kakabot.kakabot where maincurr = '" + maincurr + "' and currency = '" + currency + "' and date(cas) = CURDATE()) as a where a.stav ='" + stav + "' group by stav;"
+        # print(veta)
         x.execute(veta)
-        return x.fetchone()[0]
+        vysledek = x.fetchall()
+        for x in vysledek:
+            dnesniprumerkurzprodej = x[1]
+            dnesprodanocc = x[2]
+            dnesprodanomaincurr = x[3]
+        cnx.close()
+        # tady jsem musel ukoncit a znovu zacis sql, jinak mi to furt vyhazovalo chybu
+        time.sleep(1)
+        cnx = mysql.connector.connect(user=uzivatel, password=heslo, host=server, database=db)
+        x = cnx.cursor()
+        stav = "nakup"
+        veta = "select stav,sum(za)/sum(kolik) as kurz, sum(kolik) as cc, sum(za) as za from (select stav,kolik, kurz * kolik as za from kakabot.kakabot where maincurr = '" + maincurr + "' and currency = '" + currency + "' and date(cas) = CURDATE()) as a where a.stav ='" + stav + "' group by stav;"
+        print(veta)
+        x.execute(veta)
+        vysledek = x.fetchall()
+        for x in vysledek:
+            dnesniprumerkurznakup = x[1]
+            dnesnakoupenocc = x[2]
+            dnesnakoupenomaincurr = x[3]
     except:
-        return 'nic'
-    cnx.close()
+        print("nepovedlo se")
+
 
 def sestav_vetu():
     global ccpoint, ccactual, cclast, stav, plus
@@ -197,7 +222,7 @@ def nakupyo(kurz,zakolik,poznamka):
     nakup = zakolik  / kurz
     print(str(datetime.datetime.now()) +" budem nakupovat : " + currency + " za >" + str(zakolik) + " " + maincurr)
     print(nakup)
-    if prodejpri > kurz or nosecuremod:
+    if dnesniprumerkurzprodej > kurz or nosecuremod:  # if prodejpri > kurz or nosecuremod:
         odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).buy(par, kurz, nakup)
         print(odpoved)
         o = json.loads(json.dumps(odpoved))
@@ -227,7 +252,7 @@ def nakupyo(kurz,zakolik,poznamka):
 def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za kolik v maincurr, poznamka
     global prodejpri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
     print(str(datetime.datetime.now()) +" budem prodavat :  >" + str(zakolik) + " " + currency)
-    if nakuppri < kurz or nosecuremod:
+    if dnesniprumerkurznakup < kurz or nosecuremod:  # if nakuppri < kurz or nosecuremod:
         odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(par, kurz, zakolik)
         print(odpoved)
         o = json.loads(json.dumps(odpoved))
@@ -304,6 +329,12 @@ while run:
     except Exception:
         time.sleep(10)
         continue
+    sql_suma_dnes() #nacte z sql kolik se toho dnes prumerne prodalo a koupilo promenne: dnesniprumerkurzprodej,dnesprodanocc,dnesprodanomaincurr,dnesniprumerkurznakup,dnesnakoupenocc,dnesnakoupenomaincurr
+    if dnesniprumerkurzprodej == 0:
+        dnesniprumerkurzprodej = ccstart
+    if dnesniprumerkurznakup == 0:
+        dnesniprumerkurznakup = ccstart
+
 
     if reset == "noreset":  # do3lo k nakupu / prodeji z nabidek bylo plus
         stav = "nic"
@@ -378,7 +409,7 @@ while run:
         down = (ccactual / ccpoint)
         print(str(datetime.datetime.now().hour) + ":" + str(datetime.datetime.now().minute)+ " Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< plus > " + str(plus) + " < stav > " + stav)
 
-    if plus >= 1 and looktooffers:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
+    if plus > 1 and looktooffers:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
         if stav == "prodej":
             time.sleep(1)
             print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
@@ -421,3 +452,11 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
+
+sql_suma_dnes()
+print(dnesprodanocc,dnesniprumerkurzprodej,dnesprodanomaincurr)
+print(dnesnakoupenocc,dnesniprumerkurznakup,dnesnakoupenomaincurr)
+
+
+# doge >> 11590.50248718 : usd >> 32.90711086 . 27.3.2018 19:30
+
