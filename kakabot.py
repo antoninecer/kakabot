@@ -1,4 +1,5 @@
-import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys
+import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys, smtplib
+
 # pair
 maincurr = 'usd'  # usd-btc-doge-rur-eth-waves
 currency = 'doge'  # doge, eth
@@ -10,15 +11,19 @@ db = "kakabot"
 uzivatel = "root"
 heslo = "password"
 server = "127.0.0.1"
-
+# napojeni mailu
+fromaddr = 'rkakabot@gmail.com'
+toaddrs = 'antoninecer@gmail.com'
+musername = 'rkakabot@gmail.com'
+mpassword = 'password'
 
 # promenne pro muj algoritmus
-delay = 120  # spozdeni v sekundach
-rozhodcibod = 0.012  # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
+delay = 60  # spozdeni v sekundach
+rozhodcibod = 0.007 # 0.01 je 1 procento - kdy uskutecnit obchod kdyz se kurz zmeni o toto
 nakuppri=0 # abych neprodal levneji, nez nakoupil
 prodejpri=0  # abych nekoupil draz, nez prodal
 vklad = 0.2  # kolik dat na jeden obchod z celkoveho mnozstvi
-provize = 0.005  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
+provize = 0.003618  # obvykle yobit ma 0,2%, coz je 0.002 , ja tu mam 0.004, kde tedy chci mit i ja 0.2% :)
 maxvkladcurr = 0  # maximalni vklad na jeden prodej currency
 maxvkladmaincurr = 100  # maximalni vklad pro nakup currebncy v maincurr
 minvkladcurr=0
@@ -41,9 +46,30 @@ par = currency + '_' + maincurr
 ostatniprodej = 0
 ostatninakup = 0
 dot = 0  # tecka
+dnesniprumerkurznakup = 0
+dnesniprumerkurzprodej = 0
+dnesnakoupenocc = 0
+dnesprodanocc = 0
+dnesnakoupenomaincurr = 0
+dnesprodanomaincurr = 0
 reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccactual (kdyz vybiram z nabidek, tak nemohu resetovat reset = "noreset")
+maximalnipocetcurr = 200000  # pokud dosahneme maximalni pocet, bude dobre prodat a nakoupit jinou menu, treba btc
+run = True  # True  # jestli se spusti program hodnota True / False
 
-run = True  # jestli se spusti program hodnota True / False
+def sendmail(subject, msg):
+    global fromaddr, toaddrs, musername, mpassword
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.ehlo()
+        message = 'Subject: {}\n\n{}'.format(subject, msg)
+        server.login(musername, mpassword)
+
+        server.sendmail(fromaddr, toaddrs, msg)
+        server.quit()
+        # ...send emails
+    except:
+        print('Something went wrong...')
+
 
 def aktivni_obchody(menovypar,co):  # vybere 3 nejlepsi nabizene obchody na yobitu :menovypar "ltc_usd" :co sell/buy
     mam = False
@@ -154,18 +180,37 @@ def sql_last_stav():
         return 'nic'
     cnx.close()
 
-def sql_suma_dnes(stav, jak):  # vrati kolik dnes bylo za stav obchodovano
-    global ccactual, currency, maincurr
-    cnx = mysql.connector.connect(user=uzivatel, password=heslo, host=server, database=db)
-    x = cnx.cursor()
-    veta = "select sum(kolik) from kakabot.kakabot where date(cast(cas as datetime)) = curdate() and stav = '" + str(stav) + "' and kurz " + jak + str(ccactual) + " and currency ='" + currency +"' and maincurr ='" + maincurr + "';"
-    print(veta)
+def sql_suma_dnes():  # vrati kolik dnes bylo za stav obchodovano
+    global ccactual, currency, maincurr,dnesniprumerkurzprodej,dnesprodanocc,dnesprodanomaincurr,dnesniprumerkurznakup,dnesnakoupenocc,dnesnakoupenomaincurr
     try:
+        cnx = mysql.connector.connect(user=uzivatel, password=heslo, host=server, database=db)
+        x = cnx.cursor()
+        stav = "prodej"
+        veta = "select stav,sum(za)/sum(kolik) as kurz, sum(kolik) as cc, sum(za) as za from (select stav,kolik, kurz * kolik as za from kakabot.kakabot where maincurr = '" + maincurr + "' and currency = '" + currency + "' and date(cas) = CURDATE()) as a where a.stav ='" + stav + "' group by stav;"
+        # print(veta)
         x.execute(veta)
-        return x.fetchone()[0]
+        vysledek = x.fetchall()
+        for x in vysledek:
+            dnesniprumerkurzprodej = x[1]
+            dnesprodanocc = x[2]
+            dnesprodanomaincurr = x[3]
+        cnx.close()
+        # tady jsem musel ukoncit a znovu zacis sql, jinak mi to furt vyhazovalo chybu
+        time.sleep(1)
+        cnx = mysql.connector.connect(user=uzivatel, password=heslo, host=server, database=db)
+        x = cnx.cursor()
+        stav = "nakup"
+        veta = "select stav,sum(za)/sum(kolik) as kurz, sum(kolik) as cc, sum(za) as za from (select stav,kolik, kurz * kolik as za from kakabot.kakabot where maincurr = '" + maincurr + "' and currency = '" + currency + "' and date(cas) = CURDATE()) as a where a.stav ='" + stav + "' group by stav;"
+        # print(veta)
+        x.execute(veta)
+        vysledek = x.fetchall()
+        for x in vysledek:
+            dnesniprumerkurznakup = x[1]
+            dnesnakoupenocc = x[2]
+            dnesnakoupenomaincurr = x[3]
     except:
-        return 'nic'
-    cnx.close()
+        print("nepovedlo se")
+
 
 def sestav_vetu():
     global ccpoint, ccactual, cclast, stav, plus
@@ -177,7 +222,7 @@ def nakupyo(kurz,zakolik,poznamka):
     nakup = zakolik  / kurz
     print(str(datetime.datetime.now()) +" budem nakupovat : " + currency + " za >" + str(zakolik) + " " + maincurr)
     print(nakup)
-    if prodejpri > kurz or nosecuremod:
+    if dnesniprumerkurzprodej > kurz or nosecuremod:  # if prodejpri > kurz or nosecuremod:
         odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).buy(par, kurz, nakup)
         print(odpoved)
         o = json.loads(json.dumps(odpoved))
@@ -201,13 +246,13 @@ def nakupyo(kurz,zakolik,poznamka):
                 plus = 0
                 vloz = vklad
     else:
-        odpoved = "toto neprovedu, jelikoz posledni nakup byl za " + str(nakuppri) + " a te+d chci nakupovat za " + str(kurz)
+        odpoved = "toto neprovedu, jelikoz prumerny nakup byl za " + str(dnesniprumerkurzprodej) + " a ted chci nakupovat za " + str(kurz)
         print(odpoved)
 
 def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za kolik v maincurr, poznamka
     global prodejpri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
     print(str(datetime.datetime.now()) +" budem prodavat :  >" + str(zakolik) + " " + currency)
-    if nakuppri < kurz or nosecuremod:
+    if dnesniprumerkurznakup < kurz or nosecuremod:  # if nakuppri < kurz or nosecuremod:
         odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(par, kurz, zakolik)
         print(odpoved)
         o = json.loads(json.dumps(odpoved))
@@ -231,7 +276,7 @@ def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za k
                 plus = 0
                 vloz = vklad
     else:
-        odpoved = "toto neprovedu, jelikoz posledni prodej byl za " + str(prodejpri) + " a ted chci nakupovat za " + str(kurz)
+        odpoved = "toto neprovedu, jelikoz prumerny prodej byl za " + str(dnesniprumerkurznakup) + " a ted chci nakupovat za " + str(kurz)
         print(odpoved)
 
 
@@ -259,6 +304,12 @@ def tecka():
     sys.stdout.write('.')
     sys.stdout.flush()
 
+def vynuluj_promenne():
+    dnesniprumerkurznakup = 0
+    dnesniprumerkurzprodej = 0
+    ccstart = ccpoint
+    plus = 0
+    
 
 # zacatek programu - nacteme udaje z penezenky a kouknem za kolik jsme naposled nakoupili a prodali
 actvol()
@@ -279,11 +330,23 @@ if ccactual < prodejpri and ccactual > nakuppri:
 vloz = vklad
 print("< rozhodcibod >" + str(rozhodcibod))
 while run:
+    if datetime.datetime.now().hour == 0 and datetime.datetime.now().minute <= 5:  # prvnich 5 minut po pulnoci nebudu obchodovat
+        vynuluj_promenne()
+        print("je po pulnoci a nuluji promenne")
+        time.sleep(delay)
+        continue
+
     try:
         nacti()
     except Exception:
         time.sleep(10)
         continue
+    sql_suma_dnes() #nacte z sql kolik se toho dnes prumerne prodalo a koupilo promenne: dnesniprumerkurzprodej,dnesprodanocc,dnesprodanomaincurr,dnesniprumerkurznakup,dnesnakoupenocc,dnesnakoupenomaincurr
+    if dnesniprumerkurzprodej == 0:
+        dnesniprumerkurzprodej = ccactual
+    if dnesniprumerkurznakup == 0:
+        dnesniprumerkurznakup = ccactual
+    #  print("dnesniprumerkurznakup: " + str(dnesniprumerkurznakup) + " dnesniprumerkurzprodej: "+ str(dnesniprumerkurzprodej))
 
     if reset == "noreset":  # do3lo k nakupu / prodeji z nabidek bylo plus
         stav = "nic"
@@ -291,6 +354,9 @@ while run:
         reset = "yes"
 
     tecka()
+
+    if abs(ccstart - ccactual) > ((ccactual/100)*2):
+        sendmail('prekroceny 2%','start: '+str(ccstart)+' aktualni: '+str(ccactual))
 
     if (ccactual - ccpoint)  >= (ccactual * provize):  # zvyseni stav ovice jak 0,4% - nastav prodej
         if stav=="prodej":  # pridat kontrolu stavu a upravu plusu
@@ -324,7 +390,6 @@ while run:
     if fullhouse:  #budeme obchodovat se všímm do výše maxvkladcurr
         vloz = 1
 
-
     if stav == "prodej" and ccactual < cclast and (ccactual/ccstart)-1 > rozhodcibod :
         print("naposledy nakoupeno za >" + str(nakuppri) + " stavlast > " + stavlast + " aktualni kurz > " + str(ccactual))
         if ccactual > nakuppri:
@@ -351,9 +416,9 @@ while run:
             nakupyo(ccactual,obchodza,"nakup pri zmene kurzu")
 
     if ccactual != cclast:
-        up = (ccpoint / ccactual)
-        down = (ccactual / ccpoint)
-        print(str(datetime.datetime.now().hour) + ":" + str(datetime.datetime.now().minute)+ " Actual >" + str(ccactual) + " UP >" + str(up) + "< DOWN >" + str(down) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< plus > " + str(plus) + " < stav > " + stav)
+        rozdil = round(ccactual - cclast,5)
+        up = (ccstart / ccactual)  # puvodne bylo ccpoint a ne ccstart
+        print(str(datetime.datetime.now().hour) + ":" + str(datetime.datetime.now().minute)+ " Actual >" + str(ccactual) + " rozdil: " + str(rozdil) + " od start " + str(up) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< plus > " + str(plus) + " < stav > " + stav)
 
     if plus >= 1 and looktooffers:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
         if stav == "prodej":
@@ -399,3 +464,6 @@ while run:
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
 
+sql_suma_dnes()
+print(dnesprodanocc,dnesniprumerkurzprodej,dnesprodanomaincurr)
+print(dnesnakoupenocc,dnesniprumerkurznakup,dnesnakoupenomaincurr)
