@@ -53,10 +53,11 @@ dnesprodanocc = 0
 dnesnakoupenomaincurr = 0
 dnesprodanomaincurr = 0
 maximalnipocetcurr = 200000  # pokud dosahneme maximalni pocet, bude dobre prodat a nakoupit jinou menu, treba btc
+pomerprevodudozalohy = 0.2
 zaloznicurr = 'btc'  # kam odlevat prebytecne currency
 reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccactual (kdyz vybiram z nabidek, tak nemohu resetovat reset = "noreset")
 
-run = False  # True  # jestli se spusti program hodnota True / False
+run = True  # jestli se spusti program hodnota True / False
 
 def sendmail(subject, msg):
     global fromaddr, toaddrs, musername, mpassword
@@ -357,6 +358,10 @@ while run:
         print("je po pulnoci a nuluji promenne")
         time.sleep(delay)
         continue
+
+    if currencyvol > maximalnipocetcurr:
+        prevod = maximalnipocetcurr * pomerprevodudozalohy
+        nakupzaloha(prevod)
 
     try:
         nacti()
