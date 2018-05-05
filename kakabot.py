@@ -52,9 +52,11 @@ dnesnakoupenocc = 0
 dnesprodanocc = 0
 dnesnakoupenomaincurr = 0
 dnesprodanomaincurr = 0
-reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccactual (kdyz vybiram z nabidek, tak nemohu resetovat reset = "noreset")
 maximalnipocetcurr = 200000  # pokud dosahneme maximalni pocet, bude dobre prodat a nakoupit jinou menu, treba btc
-run = True  # True  # jestli se spusti program hodnota True / False
+zaloznicurr = 'btc'  # kam odlevat prebytecne currency
+reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccactual (kdyz vybiram z nabidek, tak nemohu resetovat reset = "noreset")
+
+run = False  # True  # jestli se spusti program hodnota True / False
 
 def sendmail(subject, msg):
     global fromaddr, toaddrs, musername, mpassword
@@ -217,6 +219,26 @@ def sestav_vetu():
     text = str(datetime.datetime.now()) + " : " + par + " Point: " + str(ccpoint) + " last: " + str(cclast) + " actual: " + str(ccactual) + " Stav >" + stav + "< plus:>" + str(plus) + "<\n"
     return text
 
+def nakupzaloha(kolik):  # pokud dosahneme ur4iteho mnozstvi treba 600000 doge, pak za p5ebytek nakup treba btc a zde je za kolik doge koupim btc (prodam doge)
+    global zaloznicurr,currencyvol, currency, maximalnipocetcurr
+    zakolik = currencyvol - maximalnipocetcurr
+    print(str(datetime.datetime.now()) +" budem nakupovat : " + zaloznicurr + " za >" + str(zakolik) + " " + currency)
+    zaloznipar = currency + '_' + zaloznicurr
+    hodnota = yobit_api.PublicApi().get_pair_ticker(pair=zaloznipar)
+    kurz = hodnota.get('last')
+    time.sleep(1)
+    #  musim dodelat, ted nemohu, vraci se milacek
+    odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(zaloznipar, kurz, kolik)
+    print(odpoved)
+    o = json.loads(json.dumps(odpoved))
+    print(o["success"])
+    if o["success"] == 1:  #podařilo se zadat nabídku na prodej do yobit
+        re = json.loads(json.dumps(o["return"]))
+        #    print(re["order_id"])
+        #   print(re["server_time"])
+        zapis("nakup " + str(kurz) + " za " + str(zakolik) + " " + maincurr)
+
+
 def nakupyo(kurz,zakolik,poznamka):
     global nakuppri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
     nakup = zakolik  / kurz
@@ -309,7 +331,7 @@ def vynuluj_promenne():
     dnesniprumerkurzprodej = 0
     ccstart = ccpoint
     plus = 0
-    
+
 
 # zacatek programu - nacteme udaje z penezenky a kouknem za kolik jsme naposled nakoupili a prodali
 actvol()
@@ -464,6 +486,6 @@ while run:
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
 
-sql_suma_dnes()
-print(dnesprodanocc,dnesniprumerkurzprodej,dnesprodanomaincurr)
-print(dnesnakoupenocc,dnesniprumerkurznakup,dnesnakoupenomaincurr)
+# doge >> 11590.50248718 : usd >> 32.90711086 . 27.3.2018 19:30
+
+# nakupzaloha(300)
