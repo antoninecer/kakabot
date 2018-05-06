@@ -16,6 +16,7 @@ fromaddr = 'rkakabot@gmail.com'
 toaddrs = 'antoninecer@gmail.com'
 musername = 'rkakabot@gmail.com'
 mpassword = 'password'
+import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys, smtplib
 
 # promenne pro muj algoritmus
 delay = 60  # spozdeni v sekundach
