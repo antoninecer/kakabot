@@ -16,7 +16,6 @@ fromaddr = 'rkakabot@gmail.com'
 toaddrs = 'antoninecer@gmail.com'
 musername = 'rkakabot@gmail.com'
 mpassword = 'password'
-import yobit_api, json, time, requests, datetime, mysql.connector,socket, sys, smtplib
 
 # promenne pro muj algoritmus
 delay = 60  # spozdeni v sekundach
@@ -57,7 +56,8 @@ maximalnipocetcurr = 200000  # pokud dosahneme maximalni pocet, bude dobre proda
 pomerprevodudozalohy = 0.2
 zaloznicurr = 'btc'  # kam odlevat prebytecne currency
 reset = "yes"  # priznak jestli po nakupu vyresetovat ccpoint a ccstart na ccactual (kdyz vybiram z nabidek, tak nemohu resetovat reset = "noreset")
-
+obchodovat = True  # jestli jen koukat(False), nebo i obchodovat(True)
+kolikprocent = 3  # kolik procent rozdil ccactual a ccstart pro poslani mailu
 run = True  # jestli se spusti program hodnota True / False
 
 def sendmail(subject, msg):
@@ -242,11 +242,12 @@ def nakupzaloha(kolik):  # pokud dosahneme ur4iteho mnozstvi treba 600000 doge, 
 
 
 def nakupyo(kurz,zakolik,poznamka):
-    global nakuppri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
+    global nakuppri, cclast, ccstart, ccpoint, currencyvol, maincurrvol,dnesniprumerkurzprodej
     nakup = zakolik  / kurz
     print(str(datetime.datetime.now()) +" budem nakupovat : " + currency + " za >" + str(zakolik) + " " + maincurr)
     print(nakup)
     if dnesniprumerkurzprodej > kurz or nosecuremod:  # if prodejpri > kurz or nosecuremod:
+        print("dnesniprumerkurzprodej :" + str(dnesniprumerkurzprodej) + " kurz: " + str(kurz))
         odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).buy(par, kurz, nakup)
         print(odpoved)
         o = json.loads(json.dumps(odpoved))
@@ -270,13 +271,14 @@ def nakupyo(kurz,zakolik,poznamka):
                 plus = 0
                 vloz = vklad
     else:
-        odpoved = "toto neprovedu, jelikoz prumerny nakup byl za " + str(dnesniprumerkurzprodej) + " a ted chci nakupovat za " + str(kurz)
+        odpoved = "toto neprovedu, jelikoz prumerny prodej byl za " + str(dnesniprumerkurzprodej) + " a ted chci nakupovat za " + str(kurz)
         print(odpoved)
 
 def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za kolik v maincurr, poznamka
     global prodejpri, cclast, ccstart, ccpoint, currencyvol, maincurrvol
     print(str(datetime.datetime.now()) +" budem prodavat :  >" + str(zakolik) + " " + currency)
     if dnesniprumerkurznakup < kurz or nosecuremod:  # if nakuppri < kurz or nosecuremod:
+        print("dnesniprumerkurznakup :" + str(dnesniprumerkurznakup) + " kurz: " + str(kurz))
         odpoved = yobit_api.TradeApi(key=yobit_key, secret_key=yobit_secret_key).sell(par, kurz, zakolik)
         print(odpoved)
         o = json.loads(json.dumps(odpoved))
@@ -300,7 +302,7 @@ def prodejyo(kurz,zakolik,poznamka):  # prodej na yobit.net parametry kurz, za k
                 plus = 0
                 vloz = vklad
     else:
-        odpoved = "toto neprovedu, jelikoz prumerny prodej byl za " + str(dnesniprumerkurznakup) + " a ted chci nakupovat za " + str(kurz)
+        odpoved = "toto neprovedu, jelikoz prumerny nakup byl za " + str(dnesniprumerkurznakup) + " a ted chci prodavat za " + str(kurz)
         print(odpoved)
 
 
@@ -374,7 +376,8 @@ while run:
         dnesniprumerkurzprodej = ccactual
     if dnesniprumerkurznakup == 0:
         dnesniprumerkurznakup = ccactual
-    #  print("dnesniprumerkurznakup: " + str(dnesniprumerkurznakup) + " dnesniprumerkurzprodej: "+ str(dnesniprumerkurzprodej))
+    if dot == 1:
+        print("dnesniprumerkurznakup: " + str(dnesniprumerkurznakup) + " dnesniprumerkurzprodej: "+ str(dnesniprumerkurzprodej))
 
     if reset == "noreset":  # do3lo k nakupu / prodeji z nabidek bylo plus
         stav = "nic"
@@ -383,10 +386,12 @@ while run:
 
     tecka()
 
-    if abs(ccstart - ccactual) > ((ccactual/100)*2):
-        sendmail('prekroceny 2%','start: '+str(ccstart)+' aktualni: '+str(ccactual))
+    if abs(ccstart - ccactual) > ((ccactual/100.0) * kolikprocent):  # pokud neobchoduje jen sleduje zvyseni/snizeni o x procent a posle mailem
+        text = str(datetime.datetime.now()) + " : " + par + " actual: " + str(ccactual) + " start: " + str(ccstart) + "<\n"
+        sendmail(par + ' prekroceno ' + str(kolikprocent) + '%',text)
+        ccstart = ccactual
 
-    if (ccactual - ccpoint)  >= (ccactual * provize):  # zvyseni stav ovice jak 0,4% - nastav prodej
+    if (ccactual - ccpoint)  >= (ccactual * provize) and obchodovat:  # zvyseni stav ovice jak 0,4% - nastav prodej
         if stav=="prodej":  # pridat kontrolu stavu a upravu plusu
             plus += 1
         else:
@@ -395,7 +400,7 @@ while run:
         ccpoint = ccactual
         # zapis()
 
-    if (ccpoint - ccactual) >= (ccactual * provize):  # snizeni stav o 0,4% - nakup
+    if (ccpoint - ccactual) >= (ccactual * provize) and obchodovat:  # snizeni stav o 0,4% - nakup
         if stav=="nakup":
             plus += 1
         else:
@@ -403,7 +408,7 @@ while run:
             plus = 0
         ccpoint = ccactual
 
-    if ((ccactual - ccstart) > 0 and (ccactual - ccstart) < (ccactual * provize)) or ((ccstart - ccactual) > 0 and (ccstart - ccactual) < (ccactual * provize)):  # zvyseni stav ovice jak 0,4% - nastav prodej
+    if (((ccactual - ccstart) > 0 and (ccactual - ccstart) < (ccactual * provize)) or ((ccstart - ccactual) > 0 and (ccstart - ccactual) < (ccactual * provize))) and obchodovat:  # zvyseni stav ovice jak 0,4% - nastav prodej
         stav = "nic"
         plus = 0
 
@@ -418,7 +423,7 @@ while run:
     if fullhouse:  #budeme obchodovat se všímm do výše maxvkladcurr
         vloz = 1
 
-    if stav == "prodej" and ccactual < cclast and (ccactual/ccstart)-1 > rozhodcibod :
+    if stav == "prodej" and ccactual < cclast and (ccactual/ccstart)-1 > rozhodcibod and obchodovat:
         print("naposledy nakoupeno za >" + str(nakuppri) + " stavlast > " + stavlast + " aktualni kurz > " + str(ccactual))
         if ccactual > nakuppri:
             actvol()
@@ -431,7 +436,7 @@ while run:
                 print(currency + " >> " + str(currencyvol) + " : " + maincurr + " >> " + str(maincurrvol) + " .")
                 prodejyo(ccactual,obchodza,"prodej pri zmene kurzu")
 
-    if stav == "nakup" and ccactual > cclast  and (ccstart/ccactual)-1 > rozhodcibod :
+    if stav == "nakup" and ccactual > cclast  and (ccstart/ccactual)-1 > rozhodcibod and obchodovat:
         actvol()
         print("naposledy prodano za > " + str(prodejpri) + " stavlast > " + stavlast + " aktualni kurz > " + str(ccactual))
         time.sleep(1)
@@ -446,9 +451,9 @@ while run:
     if ccactual != cclast:
         rozdil = round(ccactual - cclast,5)
         up = (ccstart / ccactual)  # puvodne bylo ccpoint a ne ccstart
-        print(str(datetime.datetime.now().hour) + ":" + str(datetime.datetime.now().minute)+ " Actual >" + str(ccactual) + " rozdil: " + str(rozdil) + " od start " + str(up) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< plus > " + str(plus) + " < stav > " + stav)
+        print(str(datetime.datetime.now().hour) + ":" + str(datetime.datetime.now().minute)+ " Actual >" + str(ccactual) + " Ukazatel: " + str(up) + "< last >" + str(cclast) + "< point >" + str(ccpoint) + "< start >" + str(ccstart) + "< plus > " + str(plus) + " < stav > " + stav)
 
-    if plus >= 1 and looktooffers:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
+    if plus >= 1 and looktooffers and obchodovat:  # mame zde plus nic aktivne neobchuduji, kouknemese na poptavky a nabidky do yobitu
         if stav == "prodej":
             time.sleep(1)
             print(" kurz je vyssi a koukam se do nabidek jestli tu nenajdu nejakou kde by se dalo s vyhodou prodat ")
@@ -491,7 +496,5 @@ while run:
     time.sleep(delay)  # pocka nastavenou dobu
 
 # konec programu, dalsi kod se nevykona, pouze pro testovani
-
-# doge >> 11590.50248718 : usd >> 32.90711086 . 27.3.2018 19:30
-
-# nakupzaloha(300)
+sql_suma_dnes() #nacte z sql kolik se toho dnes prumerne prodalo a koupilo promenne: dnesniprumerkurzprodej,dnesprodanocc,dnesprodanomaincurr,dnesniprumerkurznakup,dnesnakoupenocc,dnesnakoupenomaincurr
+print('dnesniprumerkurzprodej>' + str(dnesniprumerkurzprodej) + '  dnesniprumerkurznakup>' + str(dnesniprumerkurznakup))
