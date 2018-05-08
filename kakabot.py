@@ -362,7 +362,7 @@ while run:
         time.sleep(delay)
         continue
 
-    if currencyvol > maximalnipocetcurr:
+    currencyvol > maximalnipocetcurr and obchodovat:
         prevod = maximalnipocetcurr * pomerprevodudozalohy
         nakupzaloha(prevod)
 
