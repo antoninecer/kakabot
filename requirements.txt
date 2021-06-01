@@ -7,5 +7,5 @@ PyExecJS==1.5.1
 requests==2.18.4
 six==1.11.0
 timeFunc==1.0
-urllib3==1.22
+urllib3==1.26.5
 yobit-api==0.1.3
